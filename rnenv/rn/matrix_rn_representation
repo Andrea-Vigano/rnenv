@@ -1,0 +1,122 @@
+=====================
+Representation theory
+=====================
+
+Real numbers are represented as a matrix with a widely different level of complexity.
+
+RN -> [num data]
+      [den data]
+
+num data and den data are supposed to be lists of the units that compose num and den:
+
+num = 2+√3 -> [2, √3] is num data
+
+so:
+
+(3)/(4-4√5) -> [3,   0  ]
+                [4, -4√4]
+
+If num data and den data have a different size we have to append zeros to the shorter list to make them match
+Obviously, the units that compose num and den can be integers but also other RNs, making it possible to represent
+any real number imaginable.
+
+# TODO set up / get an efficient matrix handler and operations-performer
+# TODO set up a mask to permit a more intuitive object initialization than the matrix creation one
+
+num and den also are stored as a matrix:
+
+den -> [ 4, 0, 0]
+       [-4, 4, 2]
+
+where the columns represent: coefficient, radicand, and index
+each one of this values can be either an integer or another RN as well
+
+simplification is done assuming that every possible RN nested in the main matrix has already been initialized and
+reduced.
+First of all num and den are reduced separately following the same procedures.
+
+# TODO set up reducer following the guidelines here specified
+
+-> UNIT SIMPLIFICATION:
+First every line of the unit-matrix is simplified
+    -> if integer: pass (cannot be reduced by itself)
+    -> if RN (define from its classification)
+        -> integer -> merge to matrix and parse as normal line
+        -> fraction -> pass (cannot be reduced by itself) and compare to index
+        -> simple root -> merge to matrix and parse as normal line
+        -> any other class -> pass (should already be reduced as much as possible) and compare to index
+        -> if double root -> parse for special cases and simplify if possible
+    -> if root: parse as normal line
+        -> factorize radicand and index
+        -> compare factorizations (stored as a dict [factor: exponent])
+        # TODO set up / get integer complex comparison functions (like are_coprimes)
+        -> simplify
+Then the unit is simplified as a single item
+    -> merge integers
+    -> merge equal roots (same index and same radicand)
+
+-> FINAL SIMPLIFICATION
+get num and den local GCD and compare them
+-> if there is a compatibility, divide every each unit for a common factor (division must have already been set up)
+
+
+================================
+INIT specs and parameters nature
+================================
+
+init method of RN class should get num and den as 3 x N matrices (a mask is intended to be set up for an easier
+instantiation procedure), containing integers and possibly other RNs
+
+>>> a = RN(num=[[2, 0, 0], [3, 5, 2]], den=[[4, 3, 2]], index=2)
+
+represent a complex RN like
+
+√[(2 + 3√5)/(4√3)]
+
+this object could be passed as argument of another real number instantiation, like:
+
+>>> b = RN(num=[[a, 0, 0]], den=[[1, 0, 0]], index=3)
+
+b should end up being
+
+[6]√[(2 + 3√5)/(4√3)]
+
+after all the reduction process.
+
+This kind of approach is meant to be able to create a very elastic object, able to handle in the most simple way
+possible the complex structures in which real numbers can come with.
+
+======
+-> a RN object can be represented as a 3 dimensional array like 2 x N x 3 where
+2 -> num and den
+N -> number of units that build up num and den
+3 -> coefficient, radicand and index for each unit
+
+RN -> stored in [[[coefficient, radicand, index] * N] -> num, [[coefficient, radicand, index] * N] -> den]
+where the actual values are C, R, I, which can either be integers or other RNs
+
+(may create a 3dArray class for a neater code in necessary)
+======
+
+
+==========
+MASK specs
+==========
+
+The 'mask' should enable a more intuitive instantiation procedure, by eliminating as much as possible the matrices
+usage at the top level.
+For instance, creating a RN like 2√2 should not be as complex as:
+
+>>> RN(num=[[2, 0, 0]], den=[[1, 0, 0]], index=2)
+
+or
+
+>>> RN(num=[[2, 2, 2]], den=[[1, 0, 0]], index=1)
+
+(which is equivalent to the first expression)
+
+but could be something more like:
+
+>>> RN([2, 2, 2])
+
+after parsing, everything should be stored in matrix form
