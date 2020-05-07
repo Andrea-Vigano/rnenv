@@ -20,7 +20,6 @@ If num data and den data have a different size we have to append zeros to the sh
 Obviously, the units that compose num and den can be integers but also other RNs, making it possible to represent
 any real number imaginable.
 
-# TODO set up / get an efficient matrix handler and operations-performer
 # TODO set up a mask to permit a more intuitive object initialization than the matrix creation one
 
 num and den also are stored as a matrix:
@@ -95,7 +94,7 @@ N -> number of units that build up num and den
 RN -> stored in [[[coefficient, radicand, index] * N] -> num, [[coefficient, radicand, index] * N] -> den]
 where the actual values are C, R, I, which can either be integers or other RNs
 
-(may create a 3dArray class for a neater code in necessary)
+(will use numpy.array)
 ======
 
 

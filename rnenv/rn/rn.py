@@ -14,6 +14,8 @@ matrix_rn_representation.txt:
 """
 
 # Imports
+from numpy import array as ar
+from numpy import ndarray, nditer
 
 
 # Nestable real number class
@@ -33,33 +35,45 @@ class RN:
     """
 
     # permitted arguments for num, den and index parameters (as str) and add list support
-    PERMITTED_PARAMETERS = ['int', 'RN']
-    PERMITTED_PARAMETERS.append('List[' + ' or '.join(PERMITTED_PARAMETERS) + ']')
+    PERMITTED_PARAMETERS = ('numpy.ndarray',)
+    ARRAY_SIZES = (2, int(), 3)
+    ARRAY_DIM = len(ARRAY_SIZES)
+    PERMITTED_UNITS = ('int', 'RN')
 
-    def __init__(self, num, den=1, index=1):
+    def __init__(self, array, index=1):
         """
+        # TODO rewrite matrix_rn_representation to include a specific clear protocol for matrix specs
+        This method is not user friendly, it is intended to be called after a parameter parsing from the masks
+        the permit a more intuitive object instantiation
 
-        :param num: numerator parameter (can be int or RN)
-        :param den: denominator parameter (can be int or RN but != 0)
-        :param index: index of object, default set to one
+        EXAMPLE:
+        to init a '2', you may do: (ar is numpy.array)
+
+        >>> two = RN(ar([[2, 0, 0], [1, 0, 0]]))
+        >>> two == 2
+            True
+
+        this is obviously really complex for a simple integer, and that's why the usage of the masks is promoted
+
+        :param array: 3d array representing the real number (following the protocol from matrix_rn_representation)
+        :param index: index of the object, default set to one
         """
 
         # TODO set up float to fractions converter to permit float numbers to be passed as arguments (fractions.py?)
         #  must modify PERMITTED_PARAMETERS value and add 'float'
 
         # validate parameters
-        # num / den -> valid if int or RN (den also if != 0)
-        # index -> int or RN
-        self.__validate_parameters(num, den, index)
-        # simplify / reduce raw parameters
+        # -> array dimensions, specs, data types and den != 0
+        # -> index type
+        self.__validate_array(array)
+        self.__validate_den(array[1])
 
         # TODO set up reduction methods for num, den, index and num-den-index
 
-        # set parameters
-        self.num = num
-        self.den = den
-        self.index = index
-        # classify self in a complexity-based hierarchy
+        # reduce data and assign to attributes
+        self.array = array
+
+        # classify object from a complexity based hierarchy
 
     # define representation methods
     # objects are being automatically simplified during initialization so we can just iter through num and den list
@@ -74,47 +88,105 @@ class RN:
         :return: str
         """
 
-    def __validate_num(self, unit):
+    def __repr__(self):
         """
-        Validate num type
-        Raises argument error
+        repr(self)
 
-        :param unit: num (or den or index, as this method is also used by __validate_den and for index validation)
-        :return: None
+        :return: str
         """
-        def val(item):
-            if not (isinstance(item, int) or isinstance(item, RN)):
-                raise ValueError('Bad user argument, must be {}, got {} instead'.format(self.PERMITTED_PARAMETERS,
-                                                                                        type(item)))
 
-        if isinstance(unit, list):
-            for i in unit:
-                val(i)
-        else:
-            val(unit)
+    # numerator and denominator getters
+    @property
+    def num(self):
+        return self.array[0]
 
-    def __validate_den(self, den):
+    @property
+    def den(self):
+        return self.array[1]
+
+    def __validate_array_type(self, array):
         """
-        Validate den type and that den != 0
-        use __validate_num to validate den type
+        DOC at __validate_array
 
-        :param den: den
+        :param array: array parameter
         :return: None
         """
 
-        # TODO define __eq__ method for RN class
+        if not isinstance(array, ndarray):
+            raise ValueError('Bad user argument, array parameter must be type {}, got {} instead'.format(
+                self.PERMITTED_PARAMETERS, type(array)
+            ))
 
-        # first check if __eq__ is defined
+    def __validate_array_sizes_conformity(self, array):
+        """
+        DOC at __validate_array
+
+        :param array: array parameter
+        :return: None
+        """
+
+        if len(array.shape) != 3:
+            raise ValueError('Bad user argument, array must have {} dimensions, got {} instead'.format(
+                self.ARRAY_DIM, len(array.shape)
+            ))
+        if array.shape[0] != 2:
+            raise ValueError('Bad user argument, array must have a first dimension equal to {}, got {} instead'.format(
+                self.ARRAY_SIZES[0], array.shape[0]
+            ))
+        if array.shape[2] != 3:
+            raise ValueError('Bad user argument, array must have a first dimension equal to {}, got {} instead'.format(
+                self.ARRAY_SIZES[2], array.shape[2]
+            ))
+
+    def __validate_array_data_types(self, array):
+        """
+        DOC at __validate_array
+
+        :param array: array parameter
+        :return: None
+        """
+
+        for unit in nditer(array):
+            if not isinstance(unit, int) or isinstance(unit, RN):
+                raise ValueError('Bad user argument, every item in array must be {}, got {} instead'.format(
+                    self.PERMITTED_UNITS, type(unit)
+                ))
+
+    def __validate_array(self, array):
+        """
+        Validate some array specs:
+        -> is instance of numpy.ndarray (array type)
+        -> sizes conformity to the matrix_rn_representation protocol (2 x N x 3)
+        -> data types of the array
+
+        using sub methods __validate_array_[type, sizes_conformity, data_types] to split the different tasks around
+        and imporove code legibility
+
+        :param array: array passed as parameter
+        :return: None
+        """
+
+        # validate array type
+        self.__validate_array_type(array)
+        # validate sizes conformity (2 x N x 3)
+        self.__validate_array_sizes_conformity(array)
+        # validate data types
+        self.__validate_array_data_types(array)
+
+    @staticmethod
+    def __validate_den(den):
+        """
+        Validate that den != 0
+
+        :param den: den (as a matrix 3 x N)
+        :return: None
+        """
+
+        # TODO set up __ep__ method for RN class
+
         if hasattr(den, __eq__):
             if den == 0:
                 raise ValueError('Bad user argument, RN denominator cannot be zero')
-        self.__validate_num(den)
-
-    def __validate_parameters(self, num, den, index):
-        # validate parameters by calling their specific methods
-        self.__validate_num(num)
-        self.__validate_den(den)
-        self.__validate_num(index)
 
     def __classify(self):
         """
@@ -130,4 +202,20 @@ class RN:
         simple root => index is integer, den = 1, num is integer
 
         :return: str
+        """
+
+    def __reduce(self, array):
+        """
+        reduce object with array manipulation following the protocol at matrix_rn_representation.txt
+        -> reduce all
+            -> reduce each linear (num and den)
+                -> reduce each unit (N)
+                    Actual parsing start
+                    -> parse from parameters (3)
+                -> reduce unit
+            -> reduce linear
+        -> reduce all
+
+        :param array: object array
+        :return: reduced array parameter
         """
