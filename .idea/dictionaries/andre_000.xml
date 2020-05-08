@@ -2,8 +2,12 @@
   <dictionary name="andre_000">
     <words>
       <w>coprimes</w>
+      <w>linears</w>
+      <w>mathfuncs</w>
       <w>ndarray</w>
+      <w>nditer</w>
       <w>radicand</w>
+      <w>vstack</w>
     </words>
   </dictionary>
 </component>

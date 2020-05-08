@@ -119,3 +119,78 @@ but could be something more like:
 >>> RN([2, 2, 2])
 
 after parsing, everything should be stored in matrix form
+
+==================
+REDUCTION PROTOCOL
+==================
+
+RN reduction protocol.
+
+loop trough array num and den: (2)
+loop trough every unit in num / den: (N)
+    UNIT PARSING
+    reduce:
+        a unit is an integers triad referring to different aspects of itself
+        +-------------+----------+-------+
+        |      0      |     1    |   2   |
+        +-------------+----------+-------+
+        | coefficient | radicand | index |
+        +-------------+----------+-------+
+
+        so depending of this numbers we'll have different parsing possibilities
+
+        if every parameter is integer -> First level RN:
+
+            =======================
+            INTEGERS UNIT REDUCTION
+            =======================
+            -> if N = 0: return 0, 0, 0
+            -> parse CE
+                -> L = 0: ValueError
+                -> L is even and M < 0: ValueError
+                -> L < 0 and M = 0: Value Error
+            -> Parse 'special types' (easy - fast parse)
+                -> L = 1: N *= M, M = 1
+                -> M = 1, -1: N *= M, M = 1
+            -> Parse L and factorized M's exponents ot be primes
+                (using mathfuncs.factorization / .gcd)
+                -> if gcd (exponents, L) != 1:
+                    -> divide exponents and L by gcd
+            -> Parse to bring factors out of root
+                loop trough factorized M:
+                    -> if factor exponent is greater than index:
+                        -> N *= factor ** (int division between exponent and L)
+                        -> exponent = module between exponent and L
+                        (this way we avoid having to loop multiple times trough factors to be sure
+                        that parsing is complete, because we ensure that the factor moved out of the root
+                        is the greater possible)
+            -> re build M from parsed factorized (using a flag to track eventual sign)
+            -> Parse 'special types' (easy - fast parse)
+                -> L = 1: N *= M, M = 1
+                -> M = 1, -1: N *= M, M = 1
+            =======================
+
+        else -> N level RN:
+            ->
+
+==============================
+LINEAR UNITS MERGING ALGORITHM
+==============================
+    -> array manipulation
+
+    assign new empty array
+    arr = array([0, 0, 0])
+
+    get unique values in cols 1 and 2 (second and third)
+    -> unq_one = np.unique(linear[:, 1])
+    -> unq_two = np.unique(linear[:, 2])
+
+    nested loop uniques and get all the rows with same 1-2 elements
+    for one in unq_one:
+        for two in unq_two:
+            s = np.sum(linear[np.logical_and(linear[:, 1] == one, linear[:, 2] == two)][:, 0])
+            if s[0]:
+                arr = np.vstack((arr, [s, one, two]))
+    return reduced data array
+    return arr[1:]
+==============================
