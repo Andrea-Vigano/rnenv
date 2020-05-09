@@ -179,18 +179,85 @@ LINEAR UNITS MERGING ALGORITHM
     -> array manipulation
 
     assign new empty array
-    arr = array([0, 0, 0])
-
     get unique values in cols 1 and 2 (second and third)
-    -> unq_one = np.unique(linear[:, 1])
-    -> unq_two = np.unique(linear[:, 2])
 
     nested loop uniques and get all the rows with same 1-2 elements
-    for one in unq_one:
-        for two in unq_two:
-            s = np.sum(linear[np.logical_and(linear[:, 1] == one, linear[:, 2] == two)][:, 0])
-            if s[0]:
-                arr = np.vstack((arr, [s, one, two]))
+        -> get the sum of all the pos = 0 values with that specific pos 1,2 values pattern
+        -> if the 0 value is not null:
+            -> stack the sum value on the new array
+    return null array if the shape is (3,)
+    order linear by M, L sizes
+
     return reduced data array
-    return arr[1:]
 ==============================
+
+=======================
+INTER-LINEARS REDUCTION
+=======================
+    -> checks for possible reductions between numerator and denominator
+
+    -> get gcd of all the coefficients Ns
+    -> if gcd != 1:
+        divide every coefficient by gcd
+    parse for inter-units correspondence (use 3 if statement to get faster computation if no match is found)
+    -> if num and den have the same length:
+        -> if they have the same 1-2 (same irrationals part, already ordered in the same way)
+            -> if they have proportional coefficients (last as it is the heavier to perform)
+                (using mathfuncs.are_proportional)
+                -> build new array like num = factor and den = 1 (rearranging values if factor is not integer)
+    rationalize denominator where possible
+    -> if any index in denominator is greater than 1 and its length is less than 3
+        there two cases in which it is possible to rationalize the denominator
+        @ den is composed by one single root
+        -> if length of den equal to 1 (so it is rational):
+            -> multiply num by [1, den radical, den index - 1]
+            -> move den radical to coefficient and set 1-2 = 1
+        @ den is composed by two units, where the max index is 2
+        -> if the indexes are all less than 3:
+            ->
+
+
+===================
+OPERATIONS PROTOCOL
+===================
+    -> protocol defining how to perform operations with array-represented real numbers
+
+    LINEARS MULTIPLICATION:
+        multiplication between num or den matrices
+
+        (4 + 2√2) * (5 - 6√3) = 20 - 24√3 + 10√2 - 12√6
+
+        |4  1  1|   |5  1  1|   |a[0] * b[0] ->  20  1   1|
+        |2  2  2| * |-6 3  2| = |a[0] * b[1] -> -24  3   2|
+                                |a[1] * b[0] ->  10  2   2|
+                                |a[1] * b[1] -> -12  6   2|
+
+        combine units of the two factors:
+            will call them a and b
+            -> if one of the 1-2 is 1, 1:
+                pure product
+            -> else:
+                get indexes lcm
+                (using numpy.lcm)
+                coefficient product, M ** (lcm // index) * other..., indexes lcm
+
+    having defined the MULTIPLICATION between linears, most of the other ops are very easy to setup
+
+    SUM: a, b
+        num = a.num * b.den (concatenate) b.num * a.den
+        den = a.den * b,den
+
+    OPPOSITE: a
+        num = num with all the coefficient changed
+        den = den
+
+    SUB: a, b
+        == a + (-b)
+
+    MUL: a, b
+        num = a.num * b.num
+        den = a.den * b.den
+
+    DIV: a, b
+        num = a.num * b.den
+        den = a.den * b.num

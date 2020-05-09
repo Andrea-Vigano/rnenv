@@ -67,6 +67,7 @@ class RN:
         # -> index type
         self.__validate_array(array)
         self.__validate_den(array[1])
+        self.__validate_index(index)
 
         # TODO set up reduction methods for num, den, index and num-den-index
 
@@ -187,6 +188,19 @@ class RN:
         if hasattr(den, __eq__):
             if den == 0:
                 raise ValueError('Bad user argument, RN denominator cannot be zero')
+
+    def __validate_index(self, index):
+        """
+        Validate index type
+
+        :param index: index parameter
+        :return: None
+        """
+
+        if not (isinstance(index, int) or isinstance(index, RN)):
+            raise ValueError('Bad user argument, RN index must be {}, got {} instead'.format(
+                self.PERMITTED_UNITS, type(index)
+            ))
 
     def __classify(self):
         """
