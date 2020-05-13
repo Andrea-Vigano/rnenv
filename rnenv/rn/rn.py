@@ -15,7 +15,10 @@ matrix_rn_representation.txt:
 
 # Imports
 from numpy import array as ar
-from numpy import ndarray, nditer
+from numpy import ndarray
+from numpy import int_
+
+from .rnreduce import reduce_rn
 
 
 # Nestable real number class
@@ -24,7 +27,7 @@ class RN:
     Real Number class
 
     -> nestable object (understands what it is from the args it gets)
-    -> if only simple numbers (integers / floats) -> 'simple object'
+    -> if only simple numbers (integers) -> 'simple object'
     -> if other real numbers as well -> 'more complex real number'
 
     To represent irrational object an 'index' parameter is implemented, set to 1 by default.
@@ -44,7 +47,7 @@ class RN:
         """
         # TODO rewrite matrix_rn_representation to include a specific clear protocol for matrix specs
         This method is not user friendly, it is intended to be called after a parameter parsing from the masks
-        the permit a more intuitive object instantiation
+        which permit a more intuitive object instantiation
 
         EXAMPLE:
         to init a '2', you may do: (ar is numpy.array)
@@ -69,10 +72,8 @@ class RN:
         self.__validate_den(array[1])
         self.__validate_index(index)
 
-        # TODO set up reduction methods for num, den, index and num-den-index
-
         # reduce data and assign to attributes
-        self.array = array
+        self.array, self.__index = RN.__reduce(array, index)
 
         # classify object from a complexity based hierarchy
 
@@ -104,6 +105,10 @@ class RN:
     @property
     def den(self):
         return self.array[1]
+
+    @property
+    def index(self):
+        return self.__index
 
     def __validate_array_type(self, array):
         """
@@ -147,8 +152,8 @@ class RN:
         :return: None
         """
 
-        for unit in nditer(array):
-            if not isinstance(unit, int) or isinstance(unit, RN):
+        for unit in array.flat:
+            if not (isinstance(unit, int) or isinstance(unit, RN) or isinstance(unit, int_)):
                 raise ValueError('Bad user argument, every item in array must be {}, got {} instead'.format(
                     self.PERMITTED_UNITS, type(unit)
                 ))
@@ -161,7 +166,7 @@ class RN:
         -> data types of the array
 
         using sub methods __validate_array_[type, sizes_conformity, data_types] to split the different tasks around
-        and imporove code legibility
+        and improve code legibility
 
         :param array: array passed as parameter
         :return: None
@@ -178,15 +183,19 @@ class RN:
     def __validate_den(den):
         """
         Validate that den != 0
+        (this check is performed also after the reduction, it is done here to avoid
+        wasting computation time in operations which can be stopped here)
+
+        linear matrix, following the matrix_rn_representation, is equal to zero when:
+            den = [[0, M, L]] or [[N, 0, L]]
 
         :param den: den (as a matrix 3 x N)
         :return: None
         """
 
-        # TODO set up __ep__ method for RN class
-
-        if hasattr(den, __eq__):
-            if den == 0:
+        # den is a 3 x N array (other wise it would have raised an error at __validate_array)
+        if len(den) == 1:
+            if den[0, 0] == 0 or den[0, 1] == 0:
                 raise ValueError('Bad user argument, RN denominator cannot be zero')
 
     def __validate_index(self, index):
@@ -218,7 +227,8 @@ class RN:
         :return: str
         """
 
-    def __reduce(self, array):
+    @staticmethod
+    def __reduce(array, index):
         """
         reduce object with array manipulation following the protocol at matrix_rn_representation.txt
         -> reduce all
@@ -229,7 +239,12 @@ class RN:
                 -> reduce unit
             -> reduce linear
         -> reduce all
+        The actual functions performing the reduction are store inside rnreduce.py
 
         :param array: object array
+        :param index: object index
         :return: reduced array parameter
         """
+
+        num, den, index = reduce_rn(array[0], array[1], index)
+        return ar([num, den]), index
