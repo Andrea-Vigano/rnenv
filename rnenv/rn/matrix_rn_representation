@@ -213,8 +213,28 @@ INTER-LINEARS REDUCTION
             -> multiply num by [1, den radical, den index - 1]
             -> move den radical to coefficient and set 1-2 = 1
         @ den is composed by two units, where the max index is 2
-        -> if the indexes are all less than 3:
-            ->
+        -> if the indexes are all less than 3: (len must be 2)
+            -> get the conjugate of den
+            -> multiply both num by that conjugate
+            instead of multiplying den by its conjugate, will try to
+            get its value without performing the mul, for a better
+            performance.
+            -> parse the two units of den and:
+            for each unit
+            sum (coefficient ** 2) * radicand
+            den = sum
+    return num and den
+
+
+=====================
+REAL NUMBER REDUCTION
+=====================
+    reduction of the real number (executed after the reduction of num and den)
+    Parse for special cases:
+    -> if den = 0: raise ZeroDivisionError
+    -> if num = 0: set den to 1 no matter what
+
+    parse num and den matrices to have the same length
 
 
 ===================
@@ -242,6 +262,13 @@ OPERATIONS PROTOCOL
                 coefficient product, M ** (lcm // index) * other..., indexes lcm
 
     having defined the MULTIPLICATION between linears, most of the other ops are very easy to setup
+
+    LINEAR CONJUGATE: a
+        get the conjugate of a len = 2 linear object
+        when a linear has been reduced, integers units should
+        come on the first row of the matrix
+
+        return an array like [a[0], -a[1, 0] + a[1, 1:]]
 
     SUM: a, b
         num = a.num * b.den (concatenate) b.num * a.den

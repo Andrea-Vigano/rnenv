@@ -3,7 +3,7 @@ file to store all the methods and functions related to the operations between RN
 following the matrix_rn_representation protocol for ops
 """
 
-from numpy import ndarray, zeros, lcm
+from numpy import ndarray, zeros, lcm, copy
 from itertools import product
 
 
@@ -55,6 +55,32 @@ def linears_product(a: ndarray, b: ndarray) -> ndarray:
                          (one[1] ** (_lcm // one[2])) * (two[1] ** (_lcm // two[2])),
                          _lcm]
     return result
+
+
+def linear_conjugate(a: ndarray):
+    """
+    returns the conjugate of a
+    len(a) must be 2.
+    Linear conjugate: 1 + √2 -> 1 - √2
+    Won't validate parameters because this function should only be called by
+    other methods and not by the user
+
+    Following matrix_rn_representation protocol:
+
+    LINEAR CONJUGATE: a
+        get the conjugate of a len = 2 linear object
+        when a linear has been reduced, integers units should
+        come on the first row of the matrix
+
+        return an array like [a[0], -a[1, 0] + a[1, 1:]]
+
+    :param a: reduced linear object of len 2
+    :return:
+    """
+
+    b = copy(a)
+    b[1, 0] = -b[1, 0]
+    return b
 
 
 if __name__ == '__main__':

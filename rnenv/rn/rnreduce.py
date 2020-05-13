@@ -4,8 +4,58 @@ following the matrix_rn_representation protocol for reduction
 """
 
 from numpy import array
-from numpy import ndarray, unique, vstack, sum, logical_and, concatenate
+from numpy import ndarray, unique, vstack, sum, logical_and, concatenate, zeros
 from rnenv.rn.mathfuncs.funcs import factorization, build_factorized, gcd, are_proportional, fraction_from_float
+from rnenv.rn.rnops import linears_product, linear_conjugate
+
+
+def reduce_rn(num: ndarray, den: ndarray, index):
+    """
+    Reduce real number 'rn' by following the matrix_rn_representation protocol
+    for reduction.
+
+    This function call the reduction function for the numerator and denominator,
+    which calls the reducer for linears matrices, which again calls the reducer
+    for the rn_unit object.
+
+    Protocol reference:
+
+    =====================
+    REAL NUMBER REDUCTION
+    =====================
+        reduction of the real number (executed after the reduction of num and den)
+        Parse for special cases:
+        -> if den = 0: raise ZeroDivisionError
+        -> if num = 0: set den to 1 no matter what
+
+    parse num and den matrices to have the same length
+
+    :param index: index parameter, int or RN
+    :param num: numerator array
+    :param den: denominator array
+    :return: reduced Real Number
+    """
+
+    num, den = __parse_num_den(num, den)
+
+    if den[0, 0] == 0:
+        raise ZeroDivisionError('Invalid real number denominator, cannot be equal to zero')
+    elif num[0, 0] == 0:
+        den = array([1, 1, 1])
+
+    # make num and den to have the same length
+    diff = len(num) - len(den)
+    filler = zeros(diff, dtype=int)
+    if diff == 0:
+        pass
+    elif diff > 0:
+        # num bigger
+        den = vstack((den, filler))
+    else:
+        # den bigger
+        num = vstack((num, filler))
+
+    return num, den, index
 
 
 def __parse_num_den(num:  ndarray, den: ndarray):
@@ -28,6 +78,25 @@ def __parse_num_den(num:  ndarray, den: ndarray):
                 -> if they have proportional coefficients (last as it is the heavier to perform)
                     (using mathfuncs.are_proportional)
                     -> build new array like num = factor and den = 1 (rearranging values if factor is not integer)
+        rationalize denominator where possible
+        -> if any index in denominator is greater than 1 and its length is less than 3
+            there two cases in which it is possible to rationalize the denominator
+            @ den is composed by one single root
+            -> if length of den equal to 1 (so it is rational):
+                -> multiply num by [1, den radical, den index - 1]
+                -> move den radical to coefficient and set 1-2 = 1
+            @ den is composed by two units, where the max index is 2
+            -> if the indexes are all less than 3: (len must be 2)
+                -> get the conjugate of den
+                -> multiply both num by that conjugate
+                instead of multiplying den by its conjugate, will try to
+                get its value without performing the mul, for a better
+                performance.
+                -> parse the two units of den and:
+                for each unit
+                sum (coefficient ** 2) * radicand
+                den = sum
+        return num and den
 
     :param num: numerator linear 3 x N matrix
     :param den: denominator linear 3 x N matrix
@@ -39,7 +108,7 @@ def __parse_num_den(num:  ndarray, den: ndarray):
     den = __reduce_linear(den)
 
     # reduction algorithm
-    num, den = __parse_num_den(num, den)
+    num, den = __reduce_num_den(num, den)
     # rationalize denominator where possible
     # check if there are irrationals in den and length is less that 3 before function call
     if den[den[:, 2] > 1].any() and len(den) < 3:
@@ -96,8 +165,22 @@ def __rationalize_num_den(num: ndarray, den: ndarray):
     :return: rationalized num and den
     """
 
-    # if this function its called, it means that there is at least one irrational value in den
-
+    # if this function is called, it means there is at least one irrational value in den
+    # two cases
+    # case 1
+    if len(den) == 1:
+        num = __reduce_linear(linears_product(num, array([[1, den[0, 1], den[0, 2] - 1]])))
+        den = array([[den[0, 1], 1, 1]])
+    # case 2
+    # if len is not 1, then it is 2 because function is called if len(den) < 3
+    elif (den[:, 2] < 3).all():
+        cj = linear_conjugate(den)
+        num = __reduce_linear(linears_product(num, cj))
+        # parse den units
+        _den = 0
+        for unit in den:
+            _den = _den + (unit[0] ** 2) * unit[1]
+        den = _den
     return num, den
 
 
@@ -333,3 +416,7 @@ if __name__ == '__main__':
                                   [-4, 1, 1]]),
                            array([[2, 2, 2],
                                   [-2, 1, 1]])))
+
+    print(__rationalize_num_den(array([[1, 1, 1]]),
+                                array([[4, 1, 1],
+                                       [2, 2, 2]])))

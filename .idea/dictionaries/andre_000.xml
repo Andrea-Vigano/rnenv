@@ -8,6 +8,7 @@
       <w>ndarray</w>
       <w>nditer</w>
       <w>radicand</w>
+      <w>rnreduce</w>
       <w>vstack</w>
     </words>
   </dictionary>
