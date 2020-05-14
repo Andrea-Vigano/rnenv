@@ -19,6 +19,7 @@ from numpy import ndarray
 from numpy import int_
 
 from .rnreduce import reduce_rn
+from .rnprops import rn_str, rn_classification
 
 
 # Nestable real number class
@@ -65,6 +66,14 @@ class RN:
         # TODO set up float to fractions converter to permit float numbers to be passed as arguments (fractions.py?)
         #  must modify PERMITTED_PARAMETERS value and add 'float'
 
+        # TODO set up RN str and repr methods
+
+        # TODO set up RN main ops
+
+        # TODO set up RN props
+        
+        # TODO set up nested RN object creation (when the RN class is already fully working for integers)
+
         # validate parameters
         # -> array dimensions, specs, data types and den != 0
         # -> index type
@@ -82,13 +91,13 @@ class RN:
     def __str__(self):
         """
         str(self)
-        if index = 1 (default) -> won't wrap with root
-        if index = 2 -> won't specify index
-        if index != 2 -> specify index in square brackets at the start of string [index]√number
-        if den = 1 (default) -> won't print it
+        following the matrix_rn_representation protocol for string rn representation
+
+        using external function in rn.rnprops
 
         :return: str
         """
+        return rn_str(self.array, self.index)
 
     def __repr__(self):
         """
@@ -215,17 +224,43 @@ class RN:
         """
         Define the complexity level of self, useful to determine which methods / procedures should be used to
         operate with it, to save computation time a have a better performance in general
-        ===========
-        classes
-        ===========
-        RATIONALS
-        integer => den = 1, index = 1, num is integer
-        fraction => index = 1, den is integer, num is integer (rational number)
-        IRRATIONALS
-        simple root => index is integer, den = 1, num is integer
+
+        Following the matrix_rn_representation protocol:
+
+        ==========================
+        REAL NUMBER CLASSIFICATION
+        ==========================
+
+            Protocol for real numbers classification, to permit the usage of faster algorithms in special cases
+
+            @ no denominator
+            :INTEGER
+            @ denominator
+            :FRACTION
+
+            @ linears specs
+            RATIONAL
+            SIMPLE IRRATIONAL
+            MIXED IRRATIONAL
+            COMPOSED IRRATIONAL
+
+            -> total of 8 possible cases
+                INTEGER -> den = 1
+                FRACTION -> else
+
+                RATIONAL -> in num and den M = 1
+                SIMPLE IRRATIONAL -> len(num) = 1 (and not rational)
+                MIXED IRRATIONAL -> num and den data type = int (and not simple irrational)
+                COMPOSED IRRATIONAL -> else
+
+        using an external function from rn.rnprops
 
         :return: str
         """
+
+        # TODO set up classification method (and then rewrite str methods)
+
+        return rn_classification()
 
     @staticmethod
     def __reduce(array, index):

@@ -288,3 +288,45 @@ OPERATIONS PROTOCOL
     DIV: a, b
         num = a.num * b.den
         den = a.den * b.num
+
+
+==========================
+REAL NUMBER CLASSIFICATION
+==========================
+
+    Protocol for real numbers classification, to permit the usage of faster algorithms in special cases
+
+    @ no denominator
+    :INTEGER
+    @ denominator
+    :FRACTION
+
+    @ linears specs
+    RATIONAL
+    SIMPLE IRRATIONAL
+    MIXED IRRATIONAL
+    COMPOSED IRRATIONAL
+
+    -> total of 8 possible cases
+        INTEGER -> den = 1
+        FRACTION -> else
+
+        RATIONAL -> in num and den M = 1
+        SIMPLE IRRATIONAL -> len(num) = 1 (and not rational)
+        MIXED IRRATIONAL -> num and den data type = int (and not simple irrational)
+        COMPOSED IRRATIONAL -> else
+
+
+
+=================================
+REAL NUMBER STRING REPRESENTATION
+=================================
+
+    Protocol for real number string representation, based on the way numbers are referred in normal
+    math language, as in the examples that follow:
+    Will use classifiers to define the best processing algorithm for each type of real number
+
+    INTEGER (den = 1) -> '+3', '-2'
+    SIMPLE FRACTION -> '3/4', '-6/5'
+    SIMPLE ROOT -> '-2√3', '-⁴√6'
+
