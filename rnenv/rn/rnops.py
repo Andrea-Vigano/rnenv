@@ -83,6 +83,20 @@ def linear_conjugate(a: ndarray):
     return b
 
 
+def rn_neg(a):
+    """
+    change sign of numerator
+
+    :param a: RN object (access array with a.array)
+    :return: -a
+    """
+
+    # copy a to not modify original array data
+    ar = a.array
+    ar[0, :, 0] = -ar[0, :, 0]
+    return ar
+
+
 if __name__ == '__main__':
     # some fast testing
     from numpy import array
