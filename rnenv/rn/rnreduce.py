@@ -4,8 +4,9 @@ following the matrix_rn_representation protocol for reduction
 """
 
 from numpy import array
-from numpy import ndarray, unique, vstack, sum, logical_and, concatenate, zeros
-from rnenv.rn.mathfuncs.funcs import factorization, build_factorized, gcd, are_proportional, fraction_from_float
+from numpy import ndarray, unique, vstack, sum, logical_and, concatenate
+from fractions import Fraction
+from rnenv.rn.mathfuncs.funcs import factorization, build_factorized, gcd, are_proportional
 from rnenv.rn.rnops import linears_product, linear_conjugate
 
 
@@ -37,15 +38,15 @@ def reduce_rn(num: ndarray, den: ndarray, index):
     """
 
     num, den = __parse_num_den(num, den)
-
     if den[0, 0] == 0:
         raise ZeroDivisionError('Invalid real number denominator, cannot be equal to zero')
     elif num[0, 0] == 0:
         den = array([1, 1, 1])
 
     # make num and den to have the same length
-    diff = len(num) - len(den)
-    filler = zeros(diff, dtype=int)
+    diff = abs(len(num) - len(den))
+    filler = array([[0, 1, 1] * diff])
+    filler.resize((3, diff))
     if diff == 0:
         pass
     elif diff > 0:
@@ -55,7 +56,7 @@ def reduce_rn(num: ndarray, den: ndarray, index):
         # den bigger
         num = vstack((num, filler))
 
-    return num, den, index
+    return array([num, den]), index
 
 
 def __parse_num_den(num:  ndarray, den: ndarray):
@@ -141,15 +142,15 @@ def __reduce_num_den(num: ndarray, den: ndarray):
             proportional = are_proportional(num[:, 0], den[:, 0])
             if proportional:
                 # build new array from factor
-                factor = num[:, 0][0] / den[:, 0][0]
+                factor = int(num[:, 0][0]) / int(den[:, 0][0])
                 # if factor is float -> turn to integer ratio
                 if round(factor, 5) == int(factor):
                     num = array([[int(factor), 1, 1]])
                     den = array([[1, 1, 1]])
                 else:
-                    factor = fraction_from_float(factor)
-                    num = array([factor[0], 1, 1])
-                    den = array([factor[1], 1, 1])
+                    factor = Fraction(int(num[:, 0][0]), int(den[:, 0][0]))
+                    num = array([[factor.numerator, 1, 1]])
+                    den = array([[factor.denominator, 1, 1]])
     return num, den
 
 
@@ -177,10 +178,10 @@ def __rationalize_num_den(num: ndarray, den: ndarray):
         cj = linear_conjugate(den)
         num = __reduce_linear(linears_product(num, cj))
         # parse den units
-        _den = 0
+        _den = []
         for unit in den:
-            _den = _den + (unit[0] ** 2) * unit[1]
-        den = _den
+            _den.append((unit[0] ** 2) * unit[1])
+        den = array([[_den[0] - _den[1], 1, 1]])
     return num, den
 
 
