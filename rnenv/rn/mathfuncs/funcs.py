@@ -121,6 +121,7 @@ def fraction_from_float(a: float) -> (int, int):
 
     # get a to be integer by multiplying by tens until it is integer
     f = Fraction(str(a))
+    f.limit_denominator(100000000)
     return f.numerator, f.denominator
 
 

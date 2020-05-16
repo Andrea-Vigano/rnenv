@@ -9,7 +9,7 @@ radicals as a non-approximated real number
 ============
 
 ============
-matrix_rn_representation.txt:
+matrix_rn_representation.txt
 ============
 """
 
@@ -18,8 +18,49 @@ from numpy import array as ar
 from numpy import ndarray
 from numpy import int_
 
-from .rnreduce import reduce_rn
-from .rnprops import rn_str, rn_classification
+from rnenv.rn.rnreduce import reduce_rn
+from rnenv.rn.rnprops import rn_str, rn_classification
+from rnenv.rn.rnops import rn_neg
+from rnenv.rn.rnmask import Mask
+
+
+# rn initialization mask
+def rn(*args, index=1):
+    """
+    RN initialization mask to avoid the user to build the rn array by himself and permit an easier
+    usage of the object in the end.
+
+    Following the matrix_rn_representation protocol for rn masks.
+
+    accepted parameters:
+        INTEGER:
+            int
+        RATIONAL:
+            int, int
+            float
+            Fraction
+            Decimal
+        SIMPLE IRRATIONAL:
+            use index kw set to the root index
+        MIXED IRRATIONAL:
+            you may use actual sums and subs between the different units of the object you want to create
+        COMPOSED IRRATIONAL:
+            build as expression
+
+        ALGORITHM:
+            parse args:
+                args length == 1:
+                    int -> INTEGER
+                    float -> RATIONAL
+                    Fraction -> RATIONAL
+                    Decimal -> RATIONAL
+                args length == 2:
+                    int, int -> RATIONAL
+
+    :return: RN object
+    """
+
+    return RN(*(Mask(*args, index=index).associated_rn()))
 
 
 # Nestable real number class
@@ -43,6 +84,9 @@ class RN:
     ARRAY_SIZES = (2, int(), 3)
     ARRAY_DIM = len(ARRAY_SIZES)
     PERMITTED_UNITS = ('int', 'RN')
+    PERMITTED_INDEXES = PERMITTED_UNITS
+
+    COMPATIBLE_TYPES = ('RN', 'int', 'float', 'Fraction', 'Decimal')
 
     def __init__(self, array, index=1):
         """
@@ -53,8 +97,8 @@ class RN:
         EXAMPLE:
         to init a '2', you may do: (ar is numpy.array)
 
-        >>> two = RN(ar([[2, 0, 0], [1, 0, 0]]))
-        >>> two == 2
+        # >>> two = RN(ar([[2, 0, 0], [1, 0, 0]]))
+        # >>> two == 2
             True
 
         this is obviously really complex for a simple integer, and that's why the usage of the masks is promoted
@@ -65,8 +109,6 @@ class RN:
 
         # TODO set up float to fractions converter to permit float numbers to be passed as arguments (fractions.py?)
         #  must modify PERMITTED_PARAMETERS value and add 'float'
-
-        # TODO set up RN str and repr methods
 
         # TODO set up RN main ops
 
@@ -85,28 +127,37 @@ class RN:
         self.array, self.__index = RN.__reduce(array, index)
 
         # classify object from a complexity based hierarchy
+        self.__cls = self.__classify()
+
+        # string storage attribute (initialized to empty string but updated when the str method is first called)
+        # used to avoid having to build the string every time the method is called, permitting somewhat of
+        # a performance boost
+        self.__str = ''
 
     # define representation methods
-    # objects are being automatically simplified during initialization so we can just iter through num and den list
+    # objects are being automatically simplified during initialization
     def __str__(self):
         """
         str(self)
         following the matrix_rn_representation protocol for string rn representation
 
-        using external function in rn.rnprops
+        using external functions in rn.rnprops
 
-        :return: str
+        :return: string representation
         """
-        return rn_str(self.array, self.index)
+        if not self.__str:
+            self.__str = rn_str(self.array, self.__index, self.__cls)
+        return self.__str
 
     def __repr__(self):
         """
         repr(self)
 
-        :return: str
+        :return: string representation
         """
+        return str(self)
 
-    # numerator and denominator getters
+    # props getters
     @property
     def num(self):
         return self.array[0]
@@ -119,6 +170,92 @@ class RN:
     def index(self):
         return self.__index
 
+    @property
+    def cls(self):
+        return self.__cls
+
+    # type casting methods
+    def __int__(self):
+        pass
+
+    def __float__(self):
+        pass
+
+    def __bool__(self):
+        pass
+
+    # comparison methods
+    # defined for
+    # RN, int, float, [Fraction, Decimal]
+
+    def __ne__(self, other):
+        pass
+
+    def __eq__(self, other):
+        pass
+
+    def __gt__(self, other):
+        pass
+
+    def __ge__(self, other):
+        pass
+
+    def __lt__(self, other):
+        pass
+
+    def __le__(self, other):
+        pass
+
+    # operations methods
+    # defined for
+    # RN, int, float, [Fraction, Decimal]
+
+    def __neg__(self):
+        """
+        -self
+        -> change the signs of the units in num
+
+        :return: -self
+        """
+        return rn_neg(self)
+
+    def __abs__(self):
+        """
+        |self|
+        -> if self < 0, return -self
+           else return self
+
+        :return: abs(self)
+        """
+        pass
+
+    def __add__(self, other):
+        """
+        self + other
+        Operation is based on the classification of self and other
+        (and the type of other)
+
+        :param other:
+        :return:
+        """
+        pass
+
+    def __sub__(self, other):
+        pass
+
+    def __mul__(self, other):
+        pass
+
+    def __truediv__(self, other):
+        pass
+
+    def __floordiv__(self, other):
+        pass
+
+    def __pow__(self, power, modulo=None):
+        pass
+
+    # local methods
     def __validate_array_type(self, array):
         """
         DOC at __validate_array
@@ -217,7 +354,7 @@ class RN:
 
         if not (isinstance(index, int) or isinstance(index, RN)):
             raise ValueError('Bad user argument, RN index must be {}, got {} instead'.format(
-                self.PERMITTED_UNITS, type(index)
+                self.PERMITTED_INDEXES, type(index)
             ))
 
     def __classify(self):
@@ -238,7 +375,7 @@ class RN:
             @ denominator
             :FRACTION
 
-            @ linears specs
+            @ linears specs (determined for num and den)
             RATIONAL
             SIMPLE IRRATIONAL
             MIXED IRRATIONAL
@@ -260,7 +397,7 @@ class RN:
 
         # TODO set up classification method (and then rewrite str methods)
 
-        return rn_classification()
+        return rn_classification(self.array)
 
     @staticmethod
     def __reduce(array, index):
@@ -281,5 +418,11 @@ class RN:
         :return: reduced array parameter
         """
 
-        num, den, index = reduce_rn(array[0], array[1], index)
-        return ar([num, den]), index
+        array, index = reduce_rn(array[0], array[1], index)
+        return array, index
+
+
+if __name__ == '__main__':
+    a = ar([[[1, 2, 2], [1, 3, 2]], [[4, 1, 1], [1, 3, 2]]])
+    r = RN(a, 1)
+    a = rn(2, 3)
