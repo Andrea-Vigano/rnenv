@@ -22,46 +22,33 @@ class Mask:
         accepted parameters:
         INTEGER:
             int
-        RATIONAL:
-            int, int
-            float
-            Fraction
-            Decimal
-        SIMPLE IRRATIONAL:
-            use index kw set to the root index
-        MIXED IRRATIONAL:
-            you may use actual sums and subs between the different units of the object you want to create
-        COMPOSED IRRATIONAL:
+        SINGLE UNIT INTEGER:
+            int, int, int
+        OTHERS:
             build as expression
 
         ALGORITHM:
-            parse args:
-                args length == 1:
-                    int -> INTEGER
-                    float -> RATIONAL
-                    Fraction -> RATIONAL
-                    Decimal -> RATIONAL
-                args length == 2:
-                    int, int -> RATIONAL
+            validate args
+            args length = 1:
+                integer
+            args length = 3:
+                single unit
     """
 
-    PERMITTED_PARAMETERS = [('int', ), ('int', 'int'), ('float', ), ('Fraction', ), ('Decimal', )]
+    PERMITTED_PARAMETERS = [('int', ), ('int', 'int', 'int')]
     PERMITTED_TYPES = [int, float, Fraction, Decimal]
     ERROR_MSG = 'Bad user argument, must be one of {}, got {} instead'
 
-    def __init__(self, *args, index):
+    def __init__(self, *args):
         """
         validate parameters,
-        won't validate index as it is already validated at RN
 
         :param args: mask parameters
-        :param index: index int or RN
         """
 
         # validate parameters
         self.__validate_parameters(args)
         self.data = args
-        self.index = index
 
     def __validate_parameters(self, args):
         """
@@ -71,46 +58,28 @@ class Mask:
         :return: None
         """
 
-        if len(args) == 2:
-            if not (isinstance(args[0], int) and isinstance(args[1], int)):
+        if len(args) == 1 or len(args) == 3:
+            if not all(isinstance(data, int) for data in args):
                 raise ValueError(self.ERROR_MSG.format(self.PERMITTED_PARAMETERS, args))
-        elif len(args) == 1:
-            if not any(isinstance(args[0], tp) for tp in self.PERMITTED_TYPES):
-                raise ValueError(self.ERROR_MSG.format(self.PERMITTED_PARAMETERS, args))
+        else:
+            raise ValueError(self.ERROR_MSG.format(self.PERMITTED_PARAMETERS, args))
 
     def associated_rn(self):
         """
         Returns the actual real number array and index ready to
         instantiate the object
 
-        if args length is 2:
-            build array from 2 integers
-        else:
-            if int:
-                build int rn array
-            if float:
-                use fraction_from_float
-            if Fraction:
-                use numerator and denominator attributes
-            if Decimal:
-                cast to fractions
+        if args length is 1:
+            return integer
+        else: (args length is 3)
+            return unit
 
-        :return: array, index
+        :return: array
         """
 
         # parse args
         if len(self.data) == 1:
-            if isinstance(self.data[0], int):
-                self.data = (self.data[0], 1)
-            elif isinstance(self.data[0], float):
-                self.data = fraction_from_float(self.data[0])
-            elif isinstance(self.data[0], Fraction):
-                self.data = (self.data[0].numerator, self.data[0].denomiator)
-            elif isinstance(self.data[0], Decimal):
-                fr = Fraction(self.data[0])
-                fr.limit_denominator(100000000)
-                self.data = (fr.numerator, fr.denominator)
-        # build array
-        ar = array([[[self.data[0], 1, 1]],
-                    [[self.data[1], 1, 1]]])
-        return ar, self.index
+            ar = array([[[self.data[0], 1, 1]], [1, 1, 1]])
+        else:
+            ar = array([[[self.data[0], self.data[1], self.data[2]]], [[1, 1, 1]]])
+        return ar

@@ -7,10 +7,10 @@ from numpy import array
 from numpy import ndarray, unique, vstack, sum, logical_and, concatenate
 from fractions import Fraction
 from rnenv.rn.mathfuncs.funcs import factorization, build_factorized, gcd, are_proportional
-from rnenv.rn.rnops import linears_product, linear_conjugate
+from rnenv.rn.linearsops import linears_product, linear_conjugate
 
 
-def reduce_rn(num: ndarray, den: ndarray, index):
+def reduce_rn(rn_array: ndarray):
     """
     Reduce real number 'rn' by following the matrix_rn_representation protocol
     for reduction.
@@ -31,32 +31,42 @@ def reduce_rn(num: ndarray, den: ndarray, index):
 
     parse num and den matrices to have the same length
 
-    :param index: index parameter, int or RN
-    :param num: numerator array
-    :param den: denominator array
+    :param rn_array: Real Number array
     :return: reduced Real Number
     """
 
-    num, den = __parse_num_den(num, den)
+    num, den = __parse_num_den(rn_array[0], rn_array[1])
     if den[0, 0] == 0:
         raise ZeroDivisionError('Invalid real number denominator, cannot be equal to zero')
     elif num[0, 0] == 0:
         den = array([1, 1, 1])
 
-    # make num and den to have the same length
-    diff = abs(len(num) - len(den))
-    filler = array([[0, 1, 1] * diff])
-    filler.resize((3, diff))
-    if diff == 0:
-        pass
-    elif diff > 0:
-        # num bigger
-        den = vstack((den, filler))
-    else:
-        # den bigger
-        num = vstack((num, filler))
+    # fill size difference
+    num, den = fill_size_difference(num, den)
 
-    return array([num, den]), index
+    return array([num, den])
+
+
+def fill_size_difference(a: ndarray, b: ndarray):
+    """
+    fill the difference in length between a and b with [0, 1, 1] arrays
+
+    :param a: linear array
+    :param b: linear array
+    :return:  filled arrays
+    """
+
+    # make num and den to have the same length
+    diff = abs(len(a) - len(b))
+    filler = array([[0, 1, 1] * diff])
+    filler.resize((3, ))
+    if diff > 0:
+        # num bigger
+        b = vstack((b, filler))
+    elif diff < 0:
+        # den bigger
+        a = vstack((a, filler))
+    return a, b
 
 
 def __parse_num_den(num:  ndarray, den: ndarray):
@@ -115,6 +125,26 @@ def __parse_num_den(num:  ndarray, den: ndarray):
     if den[den[:, 2] > 1].any() and len(den) < 3:
         num, den = __rationalize_num_den(num, den)
     return num, den
+
+
+def __parse_index(num, den, index):
+    """
+    Parse super RN index, check of possible reductions between num, den and index
+
+    Following the matrix_rn_representation protocol:
+
+        INDEX REDUCTION
+
+        for each linear:
+        if linear length is 1
+
+    :param num:
+    :param den:
+    :param index:
+    :return:
+    """
+
+    pass
 
 
 def __reduce_num_den(num: ndarray, den: ndarray):

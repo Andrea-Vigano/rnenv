@@ -44,7 +44,7 @@ def rn_classification(array):
 
     # integer / fraction
     # den length == 1 and den = [1, 1, 1]
-    if len(array[1]) == 1 and (array[1, 0] == 1).all():
+    if len(array[1]) == 1 and (array[1][0] == 1).all():
         _class[0] = 'integer'
     else:
         _class[0] = 'fraction'
@@ -66,7 +66,7 @@ def rn_classification(array):
     return _class
 
 
-def rn_str(array, index, cls):
+def rn_str(array, cls):
     """
     String representation builder for RN objects.
     Following the matrix_rn_representation protocol for string representation:
@@ -90,7 +90,6 @@ def rn_str(array, index, cls):
             Where 'parse index' is the call of the function __root_str
 
     :param array: object array
-    :param index: object index
     :param cls: object classification data (complexity based)
     :return: string representation
     """
@@ -99,10 +98,8 @@ def rn_str(array, index, cls):
     if cls[0] == 'fraction':
         den_str = __linear_str(den, integer=bool(cls[2] == 'rational'))
         # build fraction string representation
-        root = __root_str(index)
-        return root + '(' + num_str + ')/(' + den_str + ')'
-    root = __root_str(index)
-    return root + '(' + num_str + ')'
+        return '(' + num_str + ')/(' + den_str + ')'
+    return num_str
 
 
 def __linear_str(lin, integer=False):

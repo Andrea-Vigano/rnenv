@@ -17,15 +17,17 @@ matrix_rn_representation.txt
 from numpy import array as ar
 from numpy import ndarray
 from numpy import int_
+from fractions import Fraction
+from decimal import Decimal
 
 from rnenv.rn.rnreduce import reduce_rn
 from rnenv.rn.rnprops import rn_str, rn_classification
-from rnenv.rn.rnops import rn_neg
+from rnenv.rn.rnops import rn_neg, rn_abs, rn_add, rn_sub, rn_mul, rn_div
 from rnenv.rn.rnmask import Mask
 
 
 # rn initialization mask
-def rn(*args, index=1):
+def rn(*args):
     """
     RN initialization mask to avoid the user to build the rn array by himself and permit an easier
     usage of the object in the end.
@@ -35,32 +37,21 @@ def rn(*args, index=1):
     accepted parameters:
         INTEGER:
             int
-        RATIONAL:
-            int, int
-            float
-            Fraction
-            Decimal
-        SIMPLE IRRATIONAL:
-            use index kw set to the root index
-        MIXED IRRATIONAL:
-            you may use actual sums and subs between the different units of the object you want to create
-        COMPOSED IRRATIONAL:
+        SINGLE UNIT INTEGER:
+            int, int, int
+        OTHERS:
             build as expression
 
         ALGORITHM:
-            parse args:
-                args length == 1:
-                    int -> INTEGER
-                    float -> RATIONAL
-                    Fraction -> RATIONAL
-                    Decimal -> RATIONAL
-                args length == 2:
-                    int, int -> RATIONAL
+            validate args
+            args length = 1:
+                integer
+            args length = 3:
+                single unit
 
     :return: RN object
     """
-
-    return RN(*(Mask(*args, index=index).associated_rn()))
+    return RN(Mask(*args).associated_rn())
 
 
 # Nestable real number class
@@ -86,9 +77,9 @@ class RN:
     PERMITTED_UNITS = ('int', 'RN')
     PERMITTED_INDEXES = PERMITTED_UNITS
 
-    COMPATIBLE_TYPES = ('RN', 'int', 'float', 'Fraction', 'Decimal')
+    COMPATIBLE_TYPES = (int, float, Fraction, Decimal)
 
-    def __init__(self, array, index=1):
+    def __init__(self, array):
         """
         # TODO rewrite matrix_rn_representation to include a specific clear protocol for matrix specs
         This method is not user friendly, it is intended to be called after a parameter parsing from the masks
@@ -104,27 +95,28 @@ class RN:
         this is obviously really complex for a simple integer, and that's why the usage of the masks is promoted
 
         :param array: 3d array representing the real number (following the protocol from matrix_rn_representation)
-        :param index: index of the object, default set to one
         """
 
         # TODO set up float to fractions converter to permit float numbers to be passed as arguments (fractions.py?)
         #  must modify PERMITTED_PARAMETERS value and add 'float'
 
         # TODO set up RN main ops
-
-        # TODO set up RN props
         
         # TODO set up nested RN object creation (when the RN class is already fully working for integers)
+
+        # TODO polish RN validation system
+
+        # TODO set up a validation skipper to not waste time validating data when it is not necessary
+        #  (for example when the object is created by an internal function)
 
         # validate parameters
         # -> array dimensions, specs, data types and den != 0
         # -> index type
         self.__validate_array(array)
         self.__validate_den(array[1])
-        self.__validate_index(index)
 
         # reduce data and assign to attributes
-        self.array, self.__index = RN.__reduce(array, index)
+        self.array = RN.__reduce(array)
 
         # classify object from a complexity based hierarchy
         self.__cls = self.__classify()
@@ -146,7 +138,7 @@ class RN:
         :return: string representation
         """
         if not self.__str:
-            self.__str = rn_str(self.array, self.__index, self.__cls)
+            self.__str = rn_str(self.array, self.__cls)
         return self.__str
 
     def __repr__(self):
@@ -165,10 +157,6 @@ class RN:
     @property
     def den(self):
         return self.array[1]
-
-    @property
-    def index(self):
-        return self.__index
 
     @property
     def cls(self):
@@ -217,7 +205,7 @@ class RN:
 
         :return: -self
         """
-        return rn_neg(self)
+        return RN(rn_neg(self))
 
     def __abs__(self):
         """
@@ -227,27 +215,44 @@ class RN:
 
         :return: abs(self)
         """
-        pass
+        return rn_abs(self)
 
     def __add__(self, other):
         """
         self + other
-        Operation is based on the classification of self and other
-        (and the type of other)
 
-        :param other:
-        :return:
+        :param other: compatible object
+        :return: sum
         """
-        pass
+        return RN(rn_add(self, other))
 
     def __sub__(self, other):
-        pass
+        """
+        self - other
+
+        :param other: compatible object
+        :return: difference
+        """
+        return rn_sub(self, other)
 
     def __mul__(self, other):
-        pass
+        """
+        self * other
+
+        :param other: compatible object
+        :return: product
+        """
+        return RN(rn_mul(self, other))
 
     def __truediv__(self, other):
-        pass
+        """
+        self / other
+        with other != 0
+
+        :param other: compatible object
+        :return: quotient
+        """
+        return RN(rn_div(self, other))
 
     def __floordiv__(self, other):
         pass
@@ -277,15 +282,11 @@ class RN:
         :return: None
         """
 
-        if len(array.shape) != 3:
-            raise ValueError('Bad user argument, array must have {} dimensions, got {} instead'.format(
-                self.ARRAY_DIM, len(array.shape)
-            ))
         if array.shape[0] != 2:
             raise ValueError('Bad user argument, array must have a first dimension equal to {}, got {} instead'.format(
                 self.ARRAY_SIZES[0], array.shape[0]
             ))
-        if array.shape[2] != 3:
+        if array[0][0].shape[0] != 3:
             raise ValueError('Bad user argument, array must have a first dimension equal to {}, got {} instead'.format(
                 self.ARRAY_SIZES[2], array.shape[2]
             ))
@@ -299,9 +300,10 @@ class RN:
         """
 
         for unit in array.flat:
-            if not (isinstance(unit, int) or isinstance(unit, RN) or isinstance(unit, int_)):
+            if not (isinstance(unit, int) or isinstance(unit, RN) or isinstance(unit, int_)
+                    or isinstance(unit, ndarray)):
                 raise ValueError('Bad user argument, every item in array must be {}, got {} instead'.format(
-                    self.PERMITTED_UNITS, type(unit)
+                    self.PERMITTED_UNITS + ('numpy.ndarray', ), type(unit)
                 ))
 
     def __validate_array(self, array):
@@ -343,19 +345,6 @@ class RN:
         if len(den) == 1:
             if den[0, 0] == 0 or den[0, 1] == 0:
                 raise ValueError('Bad user argument, RN denominator cannot be zero')
-
-    def __validate_index(self, index):
-        """
-        Validate index type
-
-        :param index: index parameter
-        :return: None
-        """
-
-        if not (isinstance(index, int) or isinstance(index, RN)):
-            raise ValueError('Bad user argument, RN index must be {}, got {} instead'.format(
-                self.PERMITTED_INDEXES, type(index)
-            ))
 
     def __classify(self):
         """
@@ -400,7 +389,7 @@ class RN:
         return rn_classification(self.array)
 
     @staticmethod
-    def __reduce(array, index):
+    def __reduce(array):
         """
         reduce object with array manipulation following the protocol at matrix_rn_representation.txt
         -> reduce all
@@ -414,15 +403,14 @@ class RN:
         The actual functions performing the reduction are store inside rnreduce.py
 
         :param array: object array
-        :param index: object index
         :return: reduced array parameter
         """
 
-        array, index = reduce_rn(array[0], array[1], index)
-        return array, index
+        array = reduce_rn(array)
+        return array
 
 
 if __name__ == '__main__':
     a = ar([[[1, 2, 2], [1, 3, 2]], [[4, 1, 1], [1, 3, 2]]])
-    r = RN(a, 1)
-    a = rn(2, 3)
+    r = RN(a)
+    a = rn(2, 3, 10)
