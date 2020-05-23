@@ -1,8 +1,14 @@
 <component name="ProjectDictionaryState">
   <dictionary name="andre_000">
     <words>
+      <w>abstractmethods</w>
+      <w>arccos</w>
+      <w>arccot</w>
+      <w>arcsin</w>
+      <w>arctan</w>
       <w>coef</w>
       <w>coprimes</w>
+      <w>goniometrical</w>
       <w>linears</w>
       <w>mathfuncs</w>
       <w>ndarray</w>
