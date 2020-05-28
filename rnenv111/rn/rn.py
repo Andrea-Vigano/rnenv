@@ -36,10 +36,30 @@ NOTE: in the example above, the numbers √3 and √2 fall into the second categ
 the square root operation.
 """
 
+# TODO redefine operations engine with the new functionalities added the RN class
+
 
 from abc import ABCMeta, abstractmethod, ABC
 from math import gcd
-from fractions import Fraction
+import math
+from rnenv111.rn.mathfuncs.funcs import reduce_fraction
+
+
+math = math
+
+
+# op validator (used to assert that other is always an RN, even if integers are also accepted)
+def _validate(func):
+    def inner(self, other):
+        # self is already RN
+        if not (isinstance(other, RN) or isinstance(other, int)):
+            raise ValueError('Unable to perform {} between {} (RN) and {} ({})'
+                             .format(func, self, other, type(other)))
+        if isinstance(other, int):
+            other = RN(other)
+        return func(self, other)
+
+    return inner
 
 
 class RN:
@@ -95,55 +115,153 @@ class RN:
         """
 
         if not self.op:
-            return str(self.terms[0])
+            return str(self[0])
         return self.op.string(self.terms)
 
     def __repr__(self):
+        """
+        repr(self)
+
+        :return: string representation
+        """
+
         return str(self)
 
     # data casing
     def __int__(self):
-        # TODO re write int code
+        """
+        Integer cast to RN value, if no op, returns its only term
+        else, truncate float(self), which actually calculate RN value recursively
+
+        :return: Integer
+        """
+
+        return self[0] if not self.op else int(float(self))
+
+    def __float__(self):
+        """
+        Float cast to RN value, if no op, returns its only terms cast to float
+        else, recursively calculate the value of the RN by going up the different
+        level of complexity in the representation of RN
+
+        :return: Float
+        """
+
         if not self.op:
-            return int(self.terms[0])
-        return NotImplemented
+            return float(self[0])
+        else:
+            flt_terms = tuple(map(lambda x: float(x), self.terms))
+            func = self.op.__name__.lower() if not issubclass(self.op, ArithmeticOperation) \
+                else '__' + self.op.__name__.lower() + '__'
+            code_fragment = 'flt_terms[0].' + func + ('(*flt_terms[1:])' if flt_terms[1:] else '()')
+            return float(eval(code_fragment))
+
+    def __bool__(self):
+        """
+        Boolean cast to RN value, return False only is RN
+        is equal to 0
+
+        :return: Bool value
+        """
+
+        return self != 0
+
+    # faster terms getter
+    def __getitem__(self, item):
+        """
+        self[index]
+
+        Won't validate because the index call at terms
+        will handle errors by itself
+
+        :param item: integer
+        :return: object in terms (RN or int)
+        """
+
+        return self.terms[item]
+
+    # evaluation
+    @_validate
+    def __eq__(self, other):
+        """
+        self == other
+
+        :param other: RN or int
+        :return: Boolean
+        """
+
+        if float(self) == float(other):
+            return True
+        return False
 
     # operations
     # Arithmetic operations: add, sub, mul, truediv, floordiv, pow, root (using matmul for that)
 
-    # op validator (used to assert that other is always an RN, even if integers are also accepted)
-    @staticmethod
-    def __validate(func):
-        def inner(self: RN, other: RN or int) -> RN:
-            # self is already RN
-            if not (isinstance(other, RN) or isinstance(other, int)):
-                raise ValueError('Unable to perform {} between {} (RN) and {} ({})'
-                                 .format(func, self, other, type(other)))
-            if isinstance(other, int):
-                other = RN(other)
-            return func(self, other)
-        return inner
+    # when the arguments make it to the actual function, they will always be RNs, as the decorator
+    # __validate will convert them if any integer is found
 
+    @_validate
     def __add__(self, other):
+        """
+        self + other
+
+        :param other: RN (if int is turned to RN by __validate)
+        :return: RN object sum
+        """
+
         return Add(self, other).rv()
 
+    @_validate
     def __sub__(self, other):
+        """
+        self - other
+
+        :param other: RN (if int is turned to RN by __validate)
+        :return: RN object difference
+        """
+
         return Sub(self, other).rv()
 
+    @_validate
     def __mul__(self, other):
+        """
+        self * other
+
+        :param other: RN (if int is turned to RN by __validate)
+        :return: RN object product
+        """
+
         return Mul(self, other).rv()
 
+    @_validate
     def __truediv__(self, other):
+        """
+        self / other
+
+        :param other: RN (if int is turned to RN by __validate)
+        :return: RN object quotient
+        """
+
         return TrueDiv(self, other).rv()
 
+    @_validate
     def __floordiv__(self, other):
+        """
+        self // other
+
+        :param other: RN (if int is turned to RN by __validate)
+        :return: RN object exact quotient
+        """
+
         return FloorDiv(self, other).rv()
 
+    @_validate
     def __pow__(self, power, modulo=None):
-        pass
+        return Pow(self, power).rv()
 
+    @_validate
     def __matmul__(self, other):
-        pass
+        return MatMul(self, other).rv()
 
 
 # Operation abstract class
@@ -158,6 +276,13 @@ class Operation(metaclass=ABCMeta):
     Every sub class of this is an 'operation class', meaning that every time the operation they refer to
     is performed, an instance of them is created to get the nature of the return value (if it is a 'simple' RN
     or another level of complexity is needed)
+
+    The standard return value (rv) should be defined for when each term of the operation is 'simple' (no op),
+    in the other cases, the rv should call a specific method from the Operation subclass, with a standardized name
+    defined from the op types of the terms separated by an '_'. In this way, we are able to move the case specific
+    code out of the rv method, making it easier to understand and modify. If the method is not defined, that it will
+    assume that the operation it is trying to perform cannot be reduced, so it will return the standard RN object
+    with another level of complexity to it.
 
     NOTE: the name of each operation should be (non caps sensitive) equal to the name of the function related to
     itself in RN class, for instance '__add__' -> class name should be 'Add'
@@ -214,6 +339,9 @@ class Operation(metaclass=ABCMeta):
         Return the actual RN object resulting from the operation,
         following the functional RN representation protocol.
 
+        More detailed parsing is defined in the methods defined in the
+        Operation subclasses.
+
         :return: RN object
         """
 
@@ -222,7 +350,7 @@ class Operation(metaclass=ABCMeta):
 
 
 # Arithmetic operations
-# -> Add, Sub, Mul, TrueDiv, FloorDiv (excluding Pow and Root)
+# -> Add, Sub, Mul, TrueDiv, FloorDiv, Pow, Root
 class ArithmeticOperation(Operation, ABC):
     """
     ABC super class for arithmetic operations, like Add, Sub, Mul...
@@ -255,41 +383,23 @@ class ArithmeticOperation(Operation, ABC):
         Return RN return value of the operation
         for the arithmetic operations, in general, can perform operation in this cases:
             - if each term op is none
-            - TODO if one or both ops is TrueDiv -> fractions algebra
 
         if operation cannot be performed, return Operation rv method call
 
         :return: RN object
         """
 
-        # no op case
-        if not self.terms[0].op and not self.terms[1].op:
-            # build code fragment
-            code_fragment = 'self.terms[0].terms[0].' \
-                            + '__' + self.__class__.__name__.lower() + '__' + '(self.terms[1].terms[0])'
-            return RN(eval(code_fragment))
-
-        # TrueDiv - no op ## no op - TrueDiv ## TrueDiv - TrueDiv
-        if self.terms[0].op == TrueDiv or self.terms[1].op == TrueDiv:
-            if self.terms[0].op == TrueDiv:
-                term_1 = Fraction(*self.terms[0].terms.__int__())
-            elif not self.terms[0].op:
-                term_1 = Fraction(self.terms[0].terms[0].__int__(), 1)
-            if self.terms[1].op == TrueDiv:
-                # fraction operation
-                term_2 = Fraction(*self.terms[1].terms.__int__())
-            elif not self.terms[1].op:
-                term_2 = Fraction(self.terms[1].terms[0].__int__(), 1)
-            try:
-                # build code fragment
-                code_fragment = 'term_1.' \
-                                + '__' + self.__class__.__name__.lower() + '__' + '(term_2)'
-                data = eval(code_fragment)
-                return RN(data.numerator, data.denomiator)
-            except NameError:
-                # if terms have not been defined
-                pass
-        return super().rv()
+        # call operator method
+        try:
+            # try to call the operation method for the terms defined operations
+            op_1 = self.terms[0].op
+            op_2 = self.terms[1].op
+            op_1 = op_1.__name__.lower() if op_1 else 'none'
+            op_2 = op_2.__name__.lower() if op_2 else 'none'
+            return eval('self.' + op_1 + '_' + op_2 + '(self.terms)')
+        except AttributeError:
+            # no operation method found
+            return super().rv()
 
 
 class Add(ArithmeticOperation):
@@ -300,6 +410,40 @@ class Add(ArithmeticOperation):
     def string(terms):
         return Add.string_builder()(terms)
 
+    @staticmethod
+    def none_none(terms):
+        return RN(terms[0][0].__add__(terms[1][0]))
+
+    @staticmethod
+    def truediv_none(terms):
+        """
+        fraction + integer:
+        - num + integer * den / den
+
+        :return: RN object
+        """
+
+        num, den, integer = terms[0][0][0], terms[0][1][0], terms[1][0]
+        data = (num + integer * den, den)
+        return TrueDiv(*data).rv()
+
+    @staticmethod
+    def none_truediv(terms):
+        return Add.truediv_none(tuple(reversed(terms)))
+
+    @staticmethod
+    def truediv_truediv(terms):
+        """
+        fraction + fraction
+        - num1 * den2 + num2 * den1, den1 * den2
+
+        :return: RN object
+        """
+
+        num_1, den_1, num_2, den_2 = terms[0][0][0], terms[0][1][0], terms[1][0][0], terms[1][1][0]
+        data = (num_1 * den_2 + num_2 * den_1, den_1 * den_2)
+        return TrueDiv(*data).rv()
+
 
 class Sub(ArithmeticOperation):
     OPERATOR = '-'
@@ -308,6 +452,49 @@ class Sub(ArithmeticOperation):
     def string(terms):
         return Sub.string_builder()(terms)
 
+    @staticmethod
+    def none_none(terms):
+        return RN(terms[0][0].__sub__(terms[1][0]))
+
+    @staticmethod
+    def truediv_none(terms):
+        """
+        fraction - integer:
+        - num - integer * den / den
+
+        :return: RN object
+        """
+
+        num, den, integer = terms[0][0][0], terms[0][1][0], terms[1][0]
+        data = (num - integer * den, den)
+        return TrueDiv(*data).rv()
+
+    @staticmethod
+    def none_truediv(terms):
+        """
+        integer - fraction:
+        - integer * den - num / den
+
+        :return: RN object
+        """
+
+        integer, num, den = terms[0][0], terms[1][0][0], terms[1][1][0]
+        data = (integer * den - num, den)
+        return TrueDiv(*data).rv()
+
+    @staticmethod
+    def truediv_truediv(terms):
+        """
+        fraction + fraction
+        - num1 * den2 - num2 * den1, den1 * den2
+
+        :return: RN object
+        """
+
+        num_1, den_1, num_2, den_2 = terms[0][0][0], terms[0][1][0], terms[1][0][0], terms[1][1][0]
+        data = (num_1 * den_2 - num_2 * den_1, den_1 * den_2)
+        return TrueDiv(*data).rv()
+
 
 class Mul(ArithmeticOperation):
     OPERATOR = '*'
@@ -315,6 +502,55 @@ class Mul(ArithmeticOperation):
     @staticmethod
     def string(terms):
         return Mul.string_builder()(terms)
+
+    @staticmethod
+    def none_none(terms):
+        return RN(terms[0][0].__mul__(terms[1][0]))
+
+    @staticmethod
+    def truediv_none(terms):
+        """
+        fraction * integer:
+        - num * integer, den
+        - reduce integer and den if possible
+
+        :param terms:
+        :return:
+        """
+
+        num, den, integer = terms[0][0][0], terms[0][1][0], terms[1][0]
+        _gdc = gcd(integer, den)
+        if _gdc != 1:
+            integer //= _gdc
+            den //= _gdc
+        data = (num * integer, den)
+        return TrueDiv(*data).rv()
+
+    @staticmethod
+    def none_truediv(terms):
+        return Mul.truediv_none(tuple(reversed(terms)))
+
+    @staticmethod
+    def truediv_truediv(terms):
+        """
+        fraction * fraction:
+        - num1 * num2, den1 * den2
+
+        :param terms:
+        :return:
+        """
+
+        num_1, den_1, num_2, den_2 = terms[0][0][0], terms[0][1][0], terms[1][0][0], terms[1][1][0]
+        _gcd = gcd(num_1, den_2)
+        if _gcd != 1:
+            num_1 //= _gcd
+            den_2 //= _gcd
+        _gcd = gcd(num_2, den_1)
+        if _gcd != 1:
+            num_2 //= _gcd
+            den_1 //= _gcd
+        data = (num_1 * den_2, num_2 * den_1)
+        return TrueDiv(*data).rv()
 
 
 class TrueDiv(ArithmeticOperation):
@@ -336,26 +572,57 @@ class TrueDiv(ArithmeticOperation):
     def string(terms):
         return TrueDiv.string_builder()(terms)
 
-    def rv(self):
+    @staticmethod
+    def none_none(terms):
         """
-        Custom rv for TrueDiv operation:
-        - Treat as fraction, reduce num and den to prime terms
+        No op case: check if division can be performed completely, partially or not
 
         :return: RN object
         """
+        num, den = reduce_fraction(terms[0].terms[0], terms[1].terms[0])
+        if den == 1:
+            return RN(num)
+        data = (RN(num), RN(den))
+        return RN(op=TrueDiv, *data)
 
-        if not self.terms[0].op and not self.terms[1].op:
-            dividend = self.terms[0].terms[0]
-            divisor = self.terms[1].terms[0]
-            _gcd = gcd(dividend, divisor)
-            if _gcd != 1:
-                data = (dividend // _gcd, divisor // _gcd)
-                if data[1] == 1:
-                    # exact division -> operation fully performed
-                    return RN(data[0])
-                return RN(op=self.__class__, *data)
-            return RN(op=self.__class__, *self.terms)
-        return super().rv()
+    @staticmethod
+    def truediv_none(terms):
+        """
+        fraction / integer
+
+        :param terms: dividend and divisor
+        :return: RN object
+        """
+
+        num, den, integer = terms[0][0][0], terms[0][1][0], terms[1][0]
+        data = (num, den * integer)
+        return TrueDiv(*data).rv()
+
+    @staticmethod
+    def none_truediv(terms):
+        """
+        integer / fraction
+
+        :param terms: dividend and divisor
+        :return: RN object
+        """
+
+        integer, num, den = terms[0][0], terms[1][0][0], terms[1][1][0]
+        data = (integer * den, num)
+        return TrueDiv(*data).rv()
+
+    @staticmethod
+    def truediv_truediv(terms):
+        """
+        fraction / fraction
+
+        :param terms: dividend and divisor
+        :return: RN object
+        """
+
+        num_1, den_1, num_2, den_2 = terms[0][0][0], terms[0][1][0], terms[1][0][0], terms[1][1][0]
+        data = (num_1 * den_1, num_2 * den_2)
+        return TrueDiv(*data).rv()
 
 
 class FloorDiv(ArithmeticOperation):
@@ -376,3 +643,91 @@ class FloorDiv(ArithmeticOperation):
     @staticmethod
     def string(terms):
         return FloorDiv.string_builder()(terms)
+
+    @staticmethod
+    def none_none(terms):
+        return RN(terms[0][0].__floordiv__(terms[1][0]))
+
+    @staticmethod
+    def truediv_none(terms):
+        """
+        fraction // integer
+
+        :param terms: dividend and divisor
+        :return: RN object
+        """
+
+        data = ((terms[0][0][0] / terms[0][1][0]) // terms[1][0], )
+        return RN(*data)
+
+    @staticmethod
+    def none_truediv(terms):
+        """
+        integer // fraction
+
+        :param terms: dividend and divisor
+        :return: RN object
+        """
+
+        data = ((terms[0][0]) // (terms[1][0][0] / terms[1][1][0]), )
+        return RN(*data)
+
+    @staticmethod
+    def truediv_truediv(terms):
+        """
+        fraction // fraction
+
+        :param terms: dividend and divisor
+        :return: RN object
+        """
+
+        data = ((terms[0][0][0] / terms[0][1][0]) // (terms[1][0][0] / terms[1][1][0]), )
+        return RN(*data)
+
+
+class Pow(ArithmeticOperation):
+    OPERATOR = '**'
+
+    def __validate_terms(self, terms):
+        """
+        Validate pow terms:
+        - exponent = 0 and base = 0
+        - real exponent and base < 0
+        are all cases where it is no possible to perform the operation
+
+        :param terms: base and exponent
+        :return: None
+        """
+
+    @staticmethod
+    def string(terms):
+        return Pow.string_builder()(terms)
+
+    @staticmethod
+    def none_none(terms):
+        return RN(terms[0][0].__pow__(terms[1][0]))
+
+    @staticmethod
+    def truediv_none(terms):
+        data = (terms[0][0][0] ** terms[1][0], terms[0][1][0] ** terms[1][0])
+        return TrueDiv(*data).rv()
+
+
+class MatMul(ArithmeticOperation):
+    OPERATOR = '√'
+
+    def __validate_terms(self, terms):
+        """
+        Validate root terms:
+        - radicand < 0 and even index
+        - index = 0
+        - radicand = 0 and index < 0
+        are all invalid cases where the operation is not possible
+
+        :param terms: index and radicand
+        :return: None
+        """
+
+    @staticmethod
+    def string(terms):
+        return Pow.string_builder()(terms)

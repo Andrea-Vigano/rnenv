@@ -2,23 +2,28 @@
 Functions storage
 """
 
-from numpy import broadcast_arrays, nonzero
+from math import gcd
 
 
-def gcd(a, b):
+def reduce_fraction(num: int, den: int):
     """
-    Fast gcd getter
+    reduce fraction to prime terms
 
-    :param a: integer
-    :param b: integer
-    :return: GCD of a and b
+    :param num: numerator int
+    :param den: denominator int
+    :return: reduced num and den
     """
-    a, b = broadcast_arrays(a, b)
-    a = a.copy()
-    b = b.copy()
-    pos = nonzero(b)[0]
-    while len(pos) > 0:
-        b2 = b[pos]
-        a[pos], b[pos] = b2, a[pos] % b2
-        pos = pos[b[pos]!=0]
-    return a
+    _gcd = gcd(num, den)
+    return num // _gcd, den // _gcd
+
+
+def reduce_root(index, radicand):
+    """
+    reduce root:
+    - reduce index
+    - bring terms out of root
+
+    :param index: index int
+    :param radicand: radicand int
+    :return: reduced index and radicand
+    """
