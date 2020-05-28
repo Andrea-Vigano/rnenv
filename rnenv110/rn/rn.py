@@ -20,10 +20,10 @@ from numpy import int_
 from fractions import Fraction
 from decimal import Decimal
 
-from rnenv.rn.rnreduce import reduce_rn
-from rnenv.rn.rnprops import rn_str, rn_classification
-from rnenv.rn.rnops import rn_neg, rn_abs, rn_add, rn_sub, rn_mul, rn_div
-from rnenv.rn.rnmask import Mask
+from rnenv110.rn.rnreduce import reduce_rn
+from rnenv110.rn.rnprops import rn_str, rn_classification
+from rnenv110.rn.rnops import rn_neg, rn_abs, rn_add, rn_sub, rn_mul, rn_div
+from rnenv110.rn.rnmask import Mask
 
 
 # rn initialization mask

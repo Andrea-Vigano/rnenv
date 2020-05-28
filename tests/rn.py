@@ -4,7 +4,7 @@ test
 """
 
 import numpy as np
-from rnenv.rn.rnprops import rn_str, rn_classification
+from rnenv110.rn.rnprops import rn_str, rn_classification
 
 
 class RN:

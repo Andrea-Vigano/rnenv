@@ -5,8 +5,8 @@ following the matrix_rn_representation protocol for ops
 
 from numpy import array
 
-from rnenv.rn.linearsops import linears_product, linears_sum
-from rnenv.rn.rnreduce import fill_size_difference
+from rnenv110.rn.linearsops import linears_product, linears_sum
+from rnenv110.rn.rnreduce import fill_size_difference
 
 
 def rn_neg(a):
@@ -111,7 +111,7 @@ def rn_div(a, b):
 if __name__ == '__main__':
     # some fast testing
     from random import randint
-    from rnenv.rn.rnreduce import __reduce_linear
+    from rnenv110.rn.rnreduce import __reduce_linear
 
     _one = array([[4, 1, 1], [2, 2, 2]])
     _two = array([[5, 1, 1], [-6, 3, 2]])

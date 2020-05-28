@@ -11,7 +11,7 @@ Each operation must define a 'string' staticmethod (where *args is the iterable 
 """
 
 from abc import abstractmethod, ABCMeta, ABC
-from rnenv.rn.mathfuncs.funcs import fraction_from_float
+from rnenv110.rn.mathfuncs.funcs import fraction_from_float
 
 
 EC = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹']  # exponent chars

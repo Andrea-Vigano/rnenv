@@ -6,8 +6,8 @@ following the matrix_rn_representation protocol for reduction
 from numpy import array
 from numpy import ndarray, unique, vstack, sum, logical_and, concatenate
 from fractions import Fraction
-from rnenv.rn.mathfuncs.funcs import factorization, build_factorized, gcd, are_proportional
-from rnenv.rn.linearsops import linears_product, linear_conjugate
+from rnenv110.rn.mathfuncs.funcs import factorization, build_factorized, gcd, are_proportional
+from rnenv110.rn.linearsops import linears_product, linear_conjugate
 
 
 def reduce_rn(rn_array: ndarray):

@@ -8,7 +8,7 @@ from fractions import Fraction
 from decimal import Decimal
 from numpy import array
 
-from rnenv.rn.mathfuncs.funcs import fraction_from_float
+from rnenv110.rn.mathfuncs.funcs import fraction_from_float
 
 
 # mask class

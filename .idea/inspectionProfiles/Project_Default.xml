@@ -13,6 +13,7 @@
         <list>
           <option value="bool.all" />
           <option value="int.denomiator" />
+          <option value="rnenv111.rn.rn.ArithmeticOperation.__validate_terms" />
         </list>
       </option>
     </inspection_tool>
