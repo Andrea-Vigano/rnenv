@@ -42,9 +42,9 @@ the square root operation.
 
 
 from abc import ABCMeta, abstractmethod, ABC
-from math import gcd
+from numpy import lcm
 import math
-from rnenv111.rn.mathfuncs.funcs import reduce_fraction
+from rnenv111.rn.mathfuncs.funcs import reduce_fraction, reduce_root
 
 
 math = math
@@ -156,8 +156,11 @@ class RN:
             flt_terms = tuple(map(lambda x: float(x), self.terms))
             func = self.op.__name__.lower() if not issubclass(self.op, ArithmeticOperation) \
                 else '__' + self.op.__name__.lower() + '__'
-            code_fragment = 'flt_terms[0].' + func + ('(*flt_terms[1:])' if flt_terms[1:] else '()')
-            return float(eval(code_fragment))
+            if func == '__matmul__':
+                return flt_terms[0] ** (1 / flt_terms[1])
+            else:
+                code_fragment = 'flt_terms[0].' + func + ('(*flt_terms[1:])' if flt_terms[1:] else '()')
+                return float(eval(code_fragment))
 
     def __bool__(self):
         """
@@ -281,6 +284,15 @@ class RN:
     # when the arguments make it to the actual function, they will always be RNs, as the decorator
     # __validate will convert them if any integer is found
 
+    def __neg__(self):
+        return self * -1
+
+    def __pos__(self):
+        return self
+
+    def __abs__(self):
+        return self if self >= 0 else -self
+
     @_validate
     def __add__(self, other):
         """
@@ -392,7 +404,7 @@ class RN:
         return Pow(self, power).rv()
 
     @_validate
-    def __rpow__(self, other):
+    def __rpow__(self, other, modulo=None):
         return Pow(other, self).rv()
 
     @_validate
@@ -593,6 +605,22 @@ class Add(ArithmeticOperation):
         data = (a[0] * b[1] + b[0] * a[1], a[1] * b[1])
         return TrueDiv(*data).rv()
 
+    @staticmethod
+    def matmul_matmul(a, b):
+        """
+        Root + Root
+
+        Reduce if a == b
+
+        :return: RN object
+        """
+
+        if a == b:
+            data = (2, a)
+            return RN(op=Mul, *data)
+        data = (a, b)
+        return RN(op=Add, *data)
+
 
 class Sub(ArithmeticOperation):
     OPERATOR = '-'
@@ -641,6 +669,21 @@ class Sub(ArithmeticOperation):
         data = (a[0] * b[1] - b[0] * a[1], a[1] * b[1])
         return TrueDiv(*data).rv()
 
+    @staticmethod
+    def matmul_matmul(a, b):
+        """
+        Root - Root
+
+        Reduce if a == b
+
+        :return: RN object
+        """
+
+        if a == b:
+            return RN(0)
+        data = (a, b)
+        return RN(op=Add, *data)
+
 
 class Mul(ArithmeticOperation):
     OPERATOR = '*'
@@ -681,6 +724,21 @@ class Mul(ArithmeticOperation):
 
         data = (a[0] * b[0], a[1] * b[1])
         return TrueDiv(*data).rv()
+
+    @staticmethod
+    def matmul_matmul(a, b):
+        """
+        Root * Root
+
+        get indexes lcm, result is a new root,
+        with index equal to the lcm, and the radicand
+        equal to the product of each radicand ** (lcm // old index)
+
+        :return: RN object
+        """
+
+        _lcm = int(lcm(a[0], b[0]))
+        return MatMul(_lcm, (a[1] ** (_lcm // a[0])) * (b[1] ** (_lcm // b[0]))).rv()
 
 
 class TrueDiv(ArithmeticOperation):
@@ -841,6 +899,18 @@ class Mod(ArithmeticOperation):
 class Pow(ArithmeticOperation):
     OPERATOR = '**'
 
+    def __init__(self, *terms):
+        """
+        Initialize Pow object, if exponent is negative,
+        change its value to positive and change base to 1 / base
+
+        :param terms: Pow terms
+        """
+
+        super().__init__(*terms)
+        if self.terms[1] < 0:
+            self.terms = (1 / self.terms[0], -self.terms[1])
+
     def _validate_terms(self, terms):
         """
         Validate pow terms:
@@ -891,11 +961,47 @@ class Pow(ArithmeticOperation):
 
         -> [den] Root (Integer ** num)
 
-        :return:
+        :return: RN object
         """
 
         data = (b[1], a[0] ** b[0])
         return MatMul(*data).rv()
+
+    @staticmethod
+    def truediv_truediv(a, b):
+        """
+        fraction ** fraction
+
+        -> Root(den_2, fraction_1 ** num_2)
+
+        :return: RN object
+        """
+
+        return Pow.none_truediv(a, b)
+
+    @staticmethod
+    def matmul_none(a, b):
+        """
+        Root ** Integer
+
+        -> [Index]√ (Radicand ** Integer)
+
+        :return: RN object
+        """
+
+        return MatMul(a[0], a[1] ** b).rv()
+
+    @staticmethod
+    def matmul_truediv(a, b):
+        """
+        Root ** fraction
+
+        -> [Index]√ (Radicand ** Integer)
+
+        :return: RN object
+        """
+
+        return Pow.matmul_none(a, b)
 
 
 class MatMul(ArithmeticOperation):
@@ -951,5 +1057,74 @@ class MatMul(ArithmeticOperation):
             return RN(int(root)) if not sign else RN(-int(root))
         else:
             # reduce root
-            data = (a, b)
+            mul_factor, index, radicand = reduce_root(index, radicand)
+            data = (index, radicand)
+            if mul_factor != 1:
+                data = (mul_factor, RN(op=MatMul, *data))
+                return RN(op=Mul, *data)
             return RN(op=MatMul, *data)
+
+    @staticmethod
+    def none_truediv(a, b):
+        """
+        [Integer]√ fraction
+
+        Integer root of both
+        then try rationalization
+        # TODO implement rationalization
+
+        :return: RN object
+        """
+
+        data = (MatMul(a, b[0]).rv(), MatMul(a, b[1]).rv())
+        return RN(op=TrueDiv, *data)
+
+    @staticmethod
+    def truediv_none(a, b):
+        """
+        [fraction]√ Integer
+
+        Use Integer root of base ** denominator
+
+        :return: RN object
+        """
+
+        return MatMul(a[0], Pow(b, a[1]).rv()).rv()
+
+    @staticmethod
+    def truediv_truediv(a, b):
+        """
+        [fraction]√ fraction
+
+        Same code of truediv_none
+
+        :return: RN object
+        """
+
+        return MatMul.truediv_none(a, b)
+
+    @staticmethod
+    def none_matmul(a, b):
+        """
+        [Integer]√ Root
+
+        New index is product of old indexes
+
+        :return: RN object
+        """
+
+        data = (a * b[0], b[1])
+        return RN(op=MatMul, *data)
+
+    @staticmethod
+    def truediv_matmul(a, b):
+        """
+        [fraction]√ Root
+
+        New index is product of old indexes,
+        parse as MatMul after
+
+        :return: RN object
+        """
+
+        return MatMul(a * b[0], b[1]).rv()
