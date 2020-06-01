@@ -70,6 +70,7 @@ class Operation(metaclass=ABCMeta):
     PERMITTED_OPERANDS = (int, RN)  # type: Tuple[type, ...]
     OPERANDS_NUMBER = ...  # type: int
     OPERATOR = ...  # type: str
+    PROPERTIES = ...  #type: List[str, ...]
 
     terms = ...  # type: Tuple[RN, ...]
 
