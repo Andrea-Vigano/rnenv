@@ -43,7 +43,6 @@ the square root operation.
 
 from abc import ABCMeta, abstractmethod, ABC
 from numpy import lcm
-from itertools import combinations
 import math
 from rnenv111.rn.mathfuncs.funcs import reduce_fraction, reduce_root
 
@@ -569,10 +568,112 @@ class ArithmeticOperation(Operation, ABC):
             # -> if commutative properties
             if 'commutative' in self.PROPERTIES:
                 try:
-                    return eval('self.' + op_2 + '_' + op_1 + '(*self.terms)')
+                    func = eval('self.' + op_2 + '_' + op_1)
+                    return eval('self.' + op_2 + '_' + op_1 + '(*reversed(self.terms))')
                 except AttributeError:
                     pass
             return super().rv()
+
+
+# possible data parsing in operation:
+# - Complexity level add (no operation)
+# - Nested add / sub parsing
+# - Fractional operations
+# - Addends merge into mul
+
+def _complexity_level_add(a, b):
+    """
+    Std operation parsing procedure,
+    used for Add operations that cannot
+    be reduced, so the complexity level is increased
+
+    :param a: First RN
+    :param b: Second RN
+    :return: RN sum object
+    """
+
+    # No validation needed, as this method is only called locally
+    data = (a, b)
+    return RN(op=Add, *data)
+
+
+def _sum_sub_parsing(_a: bool, _b: bool):
+    """
+    Operation parsing involving sums or subs,
+    will parse the terms involved in the actual operation
+    and try merge them.
+
+    Will have to specify where both the operands are sum / sub or only one.
+
+    :param _a: First RN
+    :param _b: Second RN
+    :return: RN object
+    """
+
+    def inner(a, b):
+        """
+        -> sum data parsing
+            list every term in the sum (considering that sum may involve more than one term)
+            - loop sum terms, if term is a sum -> parse, else add to list
+            if any of the terms in list is compatible to the int, add it
+            Re build new sum object if merging has been done
+
+        Compatibility check:
+        if a + term is not a sum, merge
+
+        Example:
+        3 + (√3 + 4) --> list = [Root 3, 4] where for is compatible with 3 (both integer)
+        -> √3 + 7
+        """
+        terms = []
+        terms += Add._parse_sum(a) if _a else [a]
+        terms += Add._parse_sum(b) if _b else [b]
+        return Add._sum_terms(Add._merge_sum(terms))
+
+    return inner
+
+
+def _fractional_sum(_a: bool, _b: bool):
+    """
+    Operation involving fractions (TrueDiv objects)
+
+    Will bring everything on a single fraction and sum the terms
+    there.
+
+    Need to specify which operands are fractions
+
+    :param _a: First RN
+    :param _b: Second RN
+    :return: RN object
+    """
+
+    def inner(a, b):
+        # hardcoded logic
+        if not _b:
+            return TrueDiv(a[0] + b * a[1], a[1]).rv()
+        if not _a:
+            return TrueDiv(b[0] + a * b[1], b[1]).rv()
+        else:
+            return TrueDiv(a[0] * b[1] + a[1] * b[0], a[1] * b[1]).rv()
+
+    return inner
+
+
+def _addends_merge(a, b):
+    """
+    Operation involving two equal addends
+    that are turned into a Mul object
+
+    :param a: First RN
+    :param b: Second RN
+    :return: RN mul object
+    """
+
+    if a == b:
+        data = (2, a)
+        return RN(op=Mul, *data)
+    data = (a, b)
+    return RN(op=Add, *data)
 
 
 class Add(ArithmeticOperation):
@@ -596,12 +697,13 @@ class Add(ArithmeticOperation):
 
         # get sum / sub terms
         for p, term in enumerate(_sum.terms):
-            if term.op == Add:
+            if term.op in (Add, Sub):
                 _list.extend(Add._parse_sum(term))
-            elif term.op == Sub:
-                _list.extend(Add._parse_sum(term)) if p == 0 else _list.extend(Add._parse_sum(-term))
             else:
-                _list.append(term)
+                if _sum.op == Sub and p == 1:
+                    _list.append(-term)
+                else:
+                    _list.append(term)
         return _list
 
     @staticmethod
@@ -614,246 +716,63 @@ class Add(ArithmeticOperation):
         :return: terms list (parsed)
         """
 
-        _list = []
-        for a, b in combinations(terms, terms):
-            _sum = a + b
-            if _sum.op != Add:
-                _list.append(_sum)
-            else:
-                _list.extend([a, b])
-        return _list
+        # sort by op class name (if terms can be merged, they have the same op)
+        terms = sorted(terms, key=lambda x: x.op.__name__.lower() if x.op else 'none')
+        for p, term in enumerate(terms):
+            try:
+                _sum = term + terms[p + 1]
+                if _sum.op != Add:
+                    terms[p] = None
+                    terms[p + 1] = _sum
+            except IndexError:
+                continue
+        return [term for term in terms if term]
 
-    # @staticmethod
-    # def none_none(a, b):
-    #     return RN(a[0] + b[0])
-    #
-    # @staticmethod
-    # def truediv_none(a, b):
-    #     """
-    #     fraction + integer:
-    #     - num + integer * den / den
-    #
-    #     :return: RN object
-    #     """
-    #
-    #     data = (a[0] + b[0] * a[1], a[1])
-    #     return TrueDiv(*data).rv()
-    #
-    # @staticmethod
-    # def none_truediv(a, b):
-    #     return Add.truediv_none(b, a)
-    #
-    # @staticmethod
-    # def truediv_truediv(a, b):
-    #     """
-    #     fraction + fraction
-    #     - num1 * den2 + num2 * den1, den1 * den2
-    #
-    #     :return: RN object
-    #     """
-    #
-    #     data = (a[0] * b[1] + b[0] * a[1], a[1] * b[1])
-    #     return TrueDiv(*data).rv()
-    #
-    # @staticmethod
-    # def matmul_matmul(a, b):
-    #     """
-    #     Root + Root
-    #
-    #     Reduce if a == b
-    #
-    #     :return: RN object
-    #     """
-    #
-    #     if a == b:
-    #         data = (2, a)
-    #         return RN(op=Mul, *data)
-    #     data = (a, b)
-    #     return RN(op=Add, *data)
+    @staticmethod
+    def _sum_terms(terms):
+        """
+        Sum up parsed sum terms
 
+        :param terms: Addends
+        :return: RN object sum
+        """
+
+        if len(terms) == 0:
+            return RN(0)
+        elif len(terms) == 1:
+            return terms[0]
+        rv = 0
+        for p, term in enumerate(terms):
+            if p == 0:
+                rv = term + terms[1]
+            elif p != 1:
+                rv += term
+        return rv
+
+    # operations explicit declarations
     @staticmethod
     def none_none(a, b):
         """
-        int + int
+        Int + Int
+
+        Simple integers sum
 
         :return: RN object
         """
 
-        return a[0] + b[0]
+        return RN(a[0] + b[0])
 
-    @staticmethod
-    def none_add(a, b):
-        """
-        int + sum of two terms
-
-        -> sum data parsing
-            list every term in the sum (considering that sum may involve more than one term)
-            - loop sum terms, if term is a sum -> parse, else add to list
-            if any of the terms in list is compatible to the int, add it
-            Re build new sum object if merging has been done
-
-        Compatibility check:
-        if a + term is not a sum, merge
-
-        Example:
-        3 + (√3 + 4) --> list = [Root 3, 4] where for is compatible with 3 (both integer)
-        -> √3 + 7
-
-        :return: RN object
-        """
-
-        terms = [a] + Add._parse_sum(b)
-        terms = Add._merge_sum(terms)
-
-        # rebuild object
-        rv = 0
-        for term in terms:
-            rv += term
-        return rv
-
-    @staticmethod
-    def none_sub(a, b):
-        """
-        Use none_add code
-
-        :return: RN object
-        """
-
-        terms = [a] + Add._parse_sum(b)
-        terms = Add._merge_sum(terms)
-
-        # rebuild object
-        rv = 0
-        for term in terms:
-            rv += term
-        return rv
-
-    @staticmethod
-    def none_mul(a, b):
-        """
-        Integer + Mul
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def none_truediv(a, b):
-        """
-        Integer + fraction
-
-        Returns (Integer) * den + num (performed if possible) / den
-
-        :return: RN object
-        """
-
-        return TrueDiv(a * b[1] + b[0], b[1]).rv()
-
-    @staticmethod
-    def none_floordiv(a, b):
-        """
-        Integer + floordiv
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def none_mod(a, b):
-        """
-        Integer + module
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def none_pow(a, b):
-        """
-        Integer + power
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def none_matmul(a, b):
-        """
-        Integer + Root
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def add_add(a, b):
-        """
-        Sum + Sum
-
-        Double loop trough each sum's terms, check for compatibility
-        and merge if possible
-
-        :return: RN object
-        """
-
-        terms = Add._parse_sum(a) + Add._parse_sum(b)
-        terms = Add._merge_sum(terms)
-
-        # rebuild object
-        rv = 0
-        for term in terms:
-            rv += term
-        return rv
-
-    @staticmethod
-    def add_sub(a, b):
-        """
-        Use add_add code
-
-        :return: RN object
-        """
-
-        terms = Add._parse_sum(a) + Add._parse_sum(b)
-        terms = Add._merge_sum(terms)
-
-        # rebuild object
-        rv = 0
-        for term in terms:
-            rv += term
-        return rv
-
-    @staticmethod
-    def add_mul(a, b):
-        """
-        Sum + Product
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
+    none_add = staticmethod(_sum_sub_parsing(False, True))
+    none_sub = staticmethod(_sum_sub_parsing(False, True))
+    none_mul = staticmethod(_complexity_level_add)
+    none_truediv = staticmethod(_fractional_sum(True, False))
+    none_floordiv = staticmethod(_complexity_level_add)
+    none_mod = staticmethod(_complexity_level_add)
+    none_pow = staticmethod(_complexity_level_add)
+    none_matmul = staticmethod(_complexity_level_add)
+    add_add = staticmethod(_sum_sub_parsing(False, True))
+    add_sub = staticmethod(_sum_sub_parsing(False, True))
+    add_mul = staticmethod(_complexity_level_add)
 
     @staticmethod
     def add_truediv(a, b):
@@ -868,238 +787,25 @@ class Add(ArithmeticOperation):
         :return: RN object
         """
 
-        terms = Add._parse_sum(a)
-        num_terms = [term * b[1] for term in terms] + [a[0]]
-        # sum num terms
-        rv = 0
-        for term in num_terms:
-            rv += term
-        return TrueDiv(rv, a[1]).rv()
-
-    @staticmethod
-    def add_floordiv(a, b):
-        """
-        Sum + floordiv (Integer)
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def add_mod(a, b):
-        """
-        Sum + module
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def add_pow(a, b):
-        """
-        Sum + power
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def add_matmul(a, b):
-        """
-        Sum + Root
-
-        Parse for possible merging
-
-        :return: RN object
-        """
-
-        terms = Add._parse_sum(a) + [b]
-        terms = Add._merge_sum(terms)
-
-        # rebuild object
-        rv = 0
-        for term in terms:
-            rv += term
-        return rv
-
-    @staticmethod
-    def sub_sub(a, b):
-        """
-        Sub + Sub
-
-        Parse for merging
-
-        :return: RN object
-        """
-
-        terms = Add._parse_sum(a) + Add._parse_sum(b)
-        terms = Add._merge_sum(terms)
-
-        # rebuild object
-        rv = 0
-        for term in terms:
-            rv += term
-        return rv
-
-    @staticmethod
-    def sub_mul(a, b):
-        """
-        Sub + Product
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def sub_truediv(a, b):
-        """
-        Sub + fraction
-
-        Put everything in a single fraction
-        Use add_truediv code
-
-        :return: RN object
-        """
-
-        return Add.add_truediv(a, b)
-
-    @staticmethod
-    def sub_floordiv(a, b):
-        """
-        Sub + Floor division
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def sub_mod(a, b):
-        """
-        Sub + Module
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def sub_pow(a, b):
-        """
-        Sub + Power
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def sub_matmul(a, b):
-        """
-        Sum + Root
-
-        Parse for possible merging
-
-        :return: RN object
-        """
-
-        terms = Add._parse_sum(a) + [b]
-        terms = Add._merge_sum(terms)
-
-        # rebuild object
-        rv = 0
-        for term in terms:
-            rv += term
-        return rv
-
-    @staticmethod
-    def mul_mul(a, b):
-        """
-        Mul + Mul
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def mul_truediv(a, b):
-        """
-        Mul + fraction
-
-        Put in a single fraction
-
-        :return: RN object
-        """
-
-        return TrueDiv(a * b[1] + b[0], b[1]).rv()
-
-    @staticmethod
-    def mul_floordiv(a, b):
-        """
-        Mul + FloorDiv
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def mul_mod(a, b):
-        """
-        Mul + module
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
-
-    @staticmethod
-    def mul_pow(a, b):
-        """
-        Mul + power
-
-        No reduction possible
-
-        :return: RN object
-        """
-
-        data = (a, b)
-        return RN(op=Add, *data)
+        terms = Add._parse_sum(a * b[1]) + [b[0]]
+        # sum num terms and return fraction
+        return TrueDiv(Add._sum_terms(terms), a[1]).rv()
+
+    add_floordiv = staticmethod(_complexity_level_add)
+    add_mod = staticmethod(_complexity_level_add)
+    add_pow = staticmethod(_complexity_level_add)
+    add_matmul = staticmethod(_sum_sub_parsing(False, True))
+    sub_sub = staticmethod(_sum_sub_parsing(False, True))
+    sub_mul = staticmethod(_complexity_level_add)
+    sub_truediv = staticmethod(_fractional_sum(True, False))
+    sub_floordiv = staticmethod(_complexity_level_add)
+    sub_mod = staticmethod(_complexity_level_add)
+    sub_pow = staticmethod(_complexity_level_add)
+    sub_matmul = staticmethod(_sum_sub_parsing(False, True))
+    mul_mul = staticmethod(_complexity_level_add)
+    mul_truediv = staticmethod(_fractional_sum(True, False))
+    mul_floordiv = staticmethod(_complexity_level_add)
+    mul_pow = staticmethod(_complexity_level_add)
 
     @staticmethod
     def mul_matmul(a, b):
@@ -1112,134 +818,30 @@ class Add(ArithmeticOperation):
         :return: RN object
         """
 
+        data = (a, b)
         if a[0] == b and not a[1].op:
             data = (a[1] + 1, b)
-            return RN(op=Mul, *data)
         elif a[1] == b and not a[0].op:
             data = (a[0] + 1, b)
-            return RN(op=Mul, *data)
-        data = (a, b)
+        if data[0].op == Add:
+            data = (a, b)
         return RN(op=Add, *data)
 
-    @staticmethod
-    def truediv_truediv(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def truediv_floordiv(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def truediv_mod(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def truediv_pow(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def truediv_matmul(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def floordiv_floordiv(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def floordiv_mod(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def floordiv_pow(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def floordiv_matmul(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def mod_mod(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def mod_pow(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def mod_matmul(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def pow_pow(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def pow_matmul(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
-
-    @staticmethod
-    def matmul_matmul(a, b):
-        """
-        DOC to be defined
-
-        :return: RN object
-        """
+    truediv_truediv = staticmethod(_fractional_sum(True, False))
+    truediv_floordiv = staticmethod(_fractional_sum(True, False))
+    truediv_mod = staticmethod(_fractional_sum(True, False))
+    truediv_pow = staticmethod(_fractional_sum(True, False))
+    truediv_matmul = staticmethod(_fractional_sum(True, False))
+    floordiv_floordiv = staticmethod(_addends_merge)
+    floordiv_mod = staticmethod(_complexity_level_add)
+    floordiv_pow = staticmethod(_complexity_level_add)
+    floordiv_matmul = staticmethod(_complexity_level_add)
+    mod_mod = staticmethod(_addends_merge)
+    mod_pow = staticmethod(_complexity_level_add)
+    mod_matmul = staticmethod(_complexity_level_add)
+    pow_pow = staticmethod(_addends_merge)
+    pow_matmul = staticmethod(_complexity_level_add)
+    matmul_matmul = staticmethod(_addends_merge)
 
 
 class Sub(ArithmeticOperation):
@@ -1248,6 +850,8 @@ class Sub(ArithmeticOperation):
     @staticmethod
     def string(terms):
         return Sub.string_builder()(terms)
+
+    # operations explicit declarations
 
     @staticmethod
     def none_none(a, b):
@@ -1307,6 +911,7 @@ class Sub(ArithmeticOperation):
 
 class Mul(ArithmeticOperation):
     OPERATOR = '*'
+    PROPERTIES = ['commutative']
 
     @staticmethod
     def string(terms):
